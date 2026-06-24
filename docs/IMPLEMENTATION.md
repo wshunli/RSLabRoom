@@ -2,11 +2,13 @@
 
 ## 技术架构
 
-- Web：React + TypeScript + Vite，桌面和移动端使用同一套响应式界面。
+- Web：Vue 3 + TypeScript + Vite，代码位于 `frontend/`，桌面和移动端使用同一套响应式界面。
 - API：推荐 NestJS 或 Spring Boot；学校已有 Java 技术栈时优先 Spring Boot。
 - 数据库：PostgreSQL / MySQL，Redis 用于短期占位、重复提交防护和热点周课表缓存。
 - 身份认证：接入学校统一身份认证（CAS / OAuth2 / OIDC），本系统只保存用户标识、姓名、单位和角色。
 - 通知：站内消息为主，可扩展企业微信、短信或邮件。
+
+前端与 API 分目录开发，但可以同域部署。后端代码统一放在 `backend/`，所有业务接口使用 `/api` 前缀；`hall/` 是历史系统，不作为新后端继续扩展。
 
 ## 核心数据模型
 
