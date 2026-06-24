@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RouterLink } from 'vue-router'
 import { MapPin, Users } from '@lucide/vue'
 import { periods } from '../data'
 import type { Room, SelectedSlot } from '../types'
@@ -27,14 +28,14 @@ function isSelected(day: number, period: number) {
 
 <template>
   <article class="room-row">
-    <div class="room-meta">
+    <RouterLink class="room-meta" :to="`/room/${room.id}`" title="查看本学期完整预约情况">
       <div class="room-number">{{ String(room.id).padStart(2, '0') }}</div>
       <div>
         <h3>{{ room.name }}</h3>
         <p><MapPin :size="14" />{{ room.building }}</p>
         <div class="room-tags"><span><Users :size="13" />{{ room.seats }} 座</span><span>{{ room.audience }}</span></div>
       </div>
-    </div>
+    </RouterLink>
     <div class="schedule">
       <div class="schedule-head">
         <span class="period-label">时段</span>

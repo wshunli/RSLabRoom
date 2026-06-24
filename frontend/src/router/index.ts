@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import UserPortal from '../views/UserPortal.vue'
+import RoomSchedule from '../views/RoomSchedule.vue'
 import GuidePortal from '../views/GuidePortal.vue'
 import AdminPortal from '../views/AdminPortal.vue'
 import AdminDashboard from '../views/admin/AdminDashboard.vue'
@@ -16,6 +17,11 @@ const router = createRouter({
       path: '/',
       name: 'user',
       component: UserPortal,
+    },
+    {
+      path: '/room/:id',
+      name: 'room-schedule',
+      component: RoomSchedule,
     },
     {
       path: '/guide',
