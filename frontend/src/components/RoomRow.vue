@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { MapPin, Users } from '@lucide/vue'
 import { busySlots, days, periods } from '../data'
-import type { Room } from '../types'
+import type { Room, SelectedSlot } from '../types'
 
-const props = defineProps<{ room: Room }>()
-const emit = defineEmits<{ select: [day: number, period: number] }>()
+const props = defineProps<{ room: Room; selected: SelectedSlot[] }>()
+const emit = defineEmits<{ toggle: [day: number, period: number] }>()
 
 function isBusy(day: number, period: number) {
   return busySlots.has(`${props.room.id}-${day}-${period}`)
+}
+
+function isSelected(day: number, period: number) {
+  return props.selected.some((slot) => slot.room.id === props.room.id && slot.day === day && slot.period === period)
 }
 </script>
 
@@ -32,10 +36,12 @@ function isBusy(day: number, period: number) {
           v-for="(_, dayIndex) in days"
           :key="dayIndex"
           :disabled="isBusy(dayIndex, periodIndex)"
-          :class="isBusy(dayIndex, periodIndex) ? 'busy' : 'free'"
-          @click="emit('select', dayIndex, periodIndex)"
+          :class="[isBusy(dayIndex, periodIndex) ? 'busy' : 'free', { selected: isSelected(dayIndex, periodIndex) }]"
+          :aria-pressed="isSelected(dayIndex, periodIndex)"
+          @click="emit('toggle', dayIndex, periodIndex)"
         >
           <template v-if="isBusy(dayIndex, periodIndex)"><span>课程</span><small>遥感原理</small></template>
+          <template v-else-if="isSelected(dayIndex, periodIndex)"><span>已选择</span><small>再次点击取消</small></template>
           <template v-else><span>空闲</span><small>可预约</small></template>
         </button>
       </div>

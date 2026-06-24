@@ -9,6 +9,9 @@ import StatCard from '../components/StatCard.vue'
 import { initialRequests, rooms } from '../data'
 import type { BookingRequest, RequestState } from '../types'
 
+defineProps<{ admin: { displayName: string } }>()
+const emit = defineEmits<{ logout: [] }>()
+
 const requests = ref<BookingRequest[]>(initialRequests.map((request) => ({ ...request })))
 const active = ref('概览')
 const pending = computed(() => requests.value.filter((request) => request.state === 'pending').length)
@@ -38,12 +41,12 @@ function updateRequest(id: string, state: RequestState) {
       >
         <component :is="item.icon" :size="18" />{{ item.name }}<b v-if="item.badge">{{ item.badge }}</b>
       </button>
-      <div class="side-bottom"><button><CircleHelp :size="18" />帮助与反馈</button><button><LogOut :size="18" />退出管理端</button></div>
+      <div class="side-bottom"><button><CircleHelp :size="18" />帮助与反馈</button><button @click="emit('logout')"><LogOut :size="18" />退出管理端</button></div>
     </aside>
 
     <section class="admin-main">
       <div class="admin-title">
-        <div><span class="kicker">ADMIN CONSOLE</span><h1>下午好，王老师</h1><p>这里是实验教学中心今天的运行概况。</p></div>
+        <div><span class="kicker">ADMIN CONSOLE</span><h1>您好，{{ admin.displayName }}</h1><p>这里是实验教学中心今天的运行概况。</p></div>
         <span class="date-card"><CalendarDays /><b>2026 年 6 月 24 日</b><small>星期三 · 第 17 周</small></span>
       </div>
       <div class="admin-stats">

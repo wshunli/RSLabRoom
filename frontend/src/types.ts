@@ -1,5 +1,10 @@
-export type PortalMode = 'user' | 'admin'
+export type PortalMode = 'user' | 'guide' | 'admin'
 export type RequestState = 'pending' | 'approved' | 'rejected'
+
+export interface AdminUser {
+  username: string
+  displayName: string
+}
 
 export interface Room {
   id: number

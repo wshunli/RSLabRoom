@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import {
-  CalendarDays, ChevronLeft, ChevronRight, Clock3, DoorOpen,
+  CalendarCheck2, CalendarDays, ChevronLeft, ChevronRight, Clock3, DoorOpen,
   ListChecks, Search, Sparkles,
 } from '@lucide/vue'
 import BookingDrawer from '../components/BookingDrawer.vue'
@@ -11,7 +11,8 @@ import type { SelectedSlot } from '../types'
 
 const query = ref('')
 const capacity = ref('全部容量')
-const selected = ref<SelectedSlot | null>(null)
+const selected = ref<SelectedSlot[]>([])
+const drawerOpen = ref(false)
 const submitted = ref(false)
 
 const filteredRooms = computed(() => rooms.filter((room) => {
@@ -20,8 +21,16 @@ const filteredRooms = computed(() => rooms.filter((room) => {
   return matchesQuery && matchesCapacity
 }))
 
-function selectSlot(room: SelectedSlot['room'], day: number, period: number) {
-  selected.value = { room, day, period }
+function toggleSlot(room: SelectedSlot['room'], day: number, period: number) {
+  const index = selected.value.findIndex((slot) => slot.room.id === room.id && slot.day === day && slot.period === period)
+  if (index >= 0) selected.value.splice(index, 1)
+  else selected.value.push({ room, day, period })
+  submitted.value = false
+}
+
+function finishBooking() {
+  drawerOpen.value = false
+  selected.value = []
   submitted.value = false
 }
 </script>
@@ -37,7 +46,7 @@ function selectSlot(room: SelectedSlot['room'], day: number, period: number) {
       <div class="hero-stats">
         <div><span class="stat-icon mint"><DoorOpen /></span><strong>7</strong><small>开放机房</small></div>
         <div><span class="stat-icon amber"><Clock3 /></span><strong>36</strong><small>本周空闲时段</small></div>
-        <div><span class="stat-icon lilac"><ListChecks /></span><strong>2</strong><small>我的进行中申请</small></div>
+        <div><span class="stat-icon lilac"><ListChecks /></span><strong>2</strong><small>进行中的申请</small></div>
       </div>
     </section>
 
@@ -55,21 +64,33 @@ function selectSlot(room: SelectedSlot['room'], day: number, period: number) {
         <select v-model="capacity">
           <option>全部容量</option><option value="50">50 人以上</option><option value="70">70 人以上</option>
         </select>
-        <button class="my-bookings"><ListChecks :size="17" /> 我的申请</button>
         <div class="legend"><span><i class="free" />空闲</span><span><i class="busy" />已占用</span></div>
       </div>
       <div class="room-list">
-        <RoomRow v-for="room in filteredRooms" :key="room.id" :room="room" @select="(day, period) => selectSlot(room, day, period)" />
+        <RoomRow
+          v-for="room in filteredRooms"
+          :key="room.id"
+          :room="room"
+          :selected="selected"
+          @toggle="(day, period) => toggleSlot(room, day, period)"
+        />
       </div>
       <div v-if="!filteredRooms.length" class="empty"><Search /><h3>没有找到符合条件的机房</h3><p>试试调整关键词或容量筛选。</p></div>
     </section>
 
+    <div v-if="selected.length" class="selection-bar">
+      <div><CalendarCheck2 /><span><strong>已选择 {{ selected.length }} 个时段</strong><small>可继续选择其他空闲时段</small></span></div>
+      <button class="clear-selection" @click="selected = []">清空</button>
+      <button class="primary" @click="drawerOpen = true">填写预约信息</button>
+    </div>
+
     <BookingDrawer
-      v-if="selected"
-      :value="selected"
+      v-if="drawerOpen && selected.length"
+      :values="selected"
       :submitted="submitted"
-      @close="selected = null"
+      @close="drawerOpen = false"
       @submit="submitted = true"
+      @finish="finishBooking"
     />
   </main>
 </template>

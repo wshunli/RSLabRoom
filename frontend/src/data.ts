@@ -1,6 +1,7 @@
 import type { BookingRequest, Room } from './types'
 
 export const days = [
+  { week: '周日', date: '06/21' },
   { week: '周一', date: '06/22' },
   { week: '周二', date: '06/23' },
   { week: '周三', date: '06/24' },
@@ -20,12 +21,18 @@ export const rooms: Room[] = [
   { id: 6, name: '202 机房', building: '附 3 楼', seats: 42, audience: '本科生院', equipment: ['教学终端', '投影', '空调'] },
 ]
 
-export const busySlots = new Set([
+const mondayFirstBusySlots = [
   '1-0-0', '1-0-1', '1-1-0', '1-1-1', '1-2-1', '1-2-2', '1-3-0', '1-3-1', '1-4-0', '1-4-1', '1-5-0', '1-5-1',
   '2-0-1', '2-1-1', '2-2-1', '2-3-1', '2-4-1', '2-5-1', '3-0-0', '3-0-1', '3-1-0', '3-1-1', '3-2-1', '3-2-2',
   '3-3-0', '3-3-1', '3-4-0', '3-4-1', '3-5-0', '3-5-1', '5-0-0', '5-0-1', '5-1-0', '5-1-1', '5-2-2', '5-3-0',
   '5-3-1', '5-4-0', '5-4-1', '5-5-0', '5-5-1',
-])
+]
+
+// 原排期数据以周一为第 0 天；增加周日后统一后移一列。
+export const busySlots = new Set(mondayFirstBusySlots.map((slot) => {
+  const [room, day, period] = slot.split('-').map(Number)
+  return `${room}-${day + 1}-${period}`
+}))
 
 export const initialRequests: BookingRequest[] = [
   { id: 'AP2026062108', applicant: '陈雨欣', unit: '遥感科学与技术系', room: '318 机房', date: '2026-06-25', period: '晚上 18:00–22:00', purpose: '遥感影像处理课程小组实验', people: 36, state: 'pending' },
