@@ -44,6 +44,9 @@ const appPageSize = ref(10)
 const appTotal = ref(0)
 const pendingTotal = ref(0)
 const appLoading = ref(false)
+const appError = ref('')
+const jumpPage = ref('')
+const pageSizeOptions = [5, 10, 15, 20]
 const statusOptions: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: '全部' },
   { value: 'pending', label: '待审批' },
@@ -51,6 +54,19 @@ const statusOptions: { value: StatusFilter; label: string }[] = [
 ]
 
 const totalPages = computed(() => Math.max(1, Math.ceil(appTotal.value / appPageSize.value)))
+const pageNumbers = computed(() => {
+  const pages: number[] = []
+  const total = totalPages.value
+  const current = appPage.value
+  let start = Math.max(1, current - 2)
+  let end = Math.min(total, current + 2)
+  if (end - start < 4) {
+    if (start === 1) end = Math.min(total, start + 4)
+    else start = Math.max(1, end - 4)
+  }
+  for (let i = start; i <= end; i++) pages.push(i)
+  return pages
+})
 const scheduledRoomCount = computed(() => new Set(scheduleRules.value.map((rule) => rule.roomId)).size)
 const navigation = computed(() => [
   { name: '概览', icon: LayoutDashboard },
@@ -63,8 +79,12 @@ const navigation = computed(() => [
 
 async function loadApplications() {
   appLoading.value = true
+  appError.value = ''
   try {
     const res = await api.getApplications(appStatus.value, appPage.value, appPageSize.value)
+    if (!res || !Array.isArray(res.items)) {
+      throw new Error('接口返回数据格式异常，缺少 items 字段')
+    }
     requests.value = res.items.map((item) => ({
       id: item.id,
       applicant: item.applicant,
@@ -76,8 +96,12 @@ async function loadApplications() {
       remarks: item.remarks,
       state: item.state,
     }))
-    appTotal.value = res.total
-    pendingTotal.value = res.pendingTotal
+    appTotal.value = res.total ?? 0
+    pendingTotal.value = res.pendingTotal ?? 0
+  } catch (err) {
+    appError.value = err instanceof Error ? err.message : '加载申请数据失败'
+    requests.value = []
+    appTotal.value = 0
   } finally {
     appLoading.value = false
   }
@@ -93,6 +117,29 @@ function changePage(delta: number) {
   const next = appPage.value + delta
   if (next < 1 || next > totalPages.value) return
   appPage.value = next
+  loadApplications()
+}
+
+function goToPage(page: number) {
+  if (page < 1 || page > totalPages.value) return
+  appPage.value = page
+  loadApplications()
+}
+
+function changePageSize(size: number) {
+  appPageSize.value = size
+  appPage.value = 1
+  loadApplications()
+}
+
+function doJumpPage() {
+  const page = parseInt(jumpPage.value, 10)
+  if (isNaN(page) || page < 1 || page > totalPages.value) {
+    alert(`请输入 1~${totalPages.value} 之间的页码`)
+    return
+  }
+  appPage.value = page
+  jumpPage.value = ''
   loadApplications()
 }
 
@@ -193,14 +240,15 @@ function roomName(roomId: number) {
       </div>
 
       <div class="admin-toolbar">
-        <div class="status-filter">
-          <span class="filter-label">审批状态</span>
+        <div class="status-tabs">
           <button
             v-for="opt in statusOptions"
             :key="opt.value"
             :class="{ active: appStatus === opt.value }"
             @click="changeStatus(opt.value)"
-          >{{ opt.label }}</button>
+          >
+            {{ opt.label }}<b v-if="opt.value === 'pending' && pendingTotal">{{ pendingTotal }}</b>
+          </button>
         </div>
       </div>
 
@@ -228,15 +276,33 @@ function roomName(roomId: number) {
                 </td>
               </tr>
               <tr v-if="appLoading"><td colspan="10" class="approval-empty">加载中…</td></tr>
+              <tr v-else-if="appError"><td colspan="10" class="approval-empty" style="color:#b34e3c">{{ appError }}</td></tr>
               <tr v-else-if="!requests.length"><td colspan="10" class="approval-empty">暂无申请记录</td></tr>
             </tbody>
           </table>
         </div>
         <div class="pagination">
+          <div class="page-size-selector">
+            <span class="filter-label">每页</span>
+            <select :value="appPageSize" @change="changePageSize(Number(($event.target as HTMLSelectElement).value))">
+              <option v-for="s in pageSizeOptions" :key="s" :value="s">{{ s }} 条</option>
+            </select>
+          </div>
           <span class="page-info">第 {{ appPage }} / {{ totalPages }} 页 · 共 {{ appTotal }} 条</span>
           <div class="page-controls">
-            <button :disabled="appPage <= 1" @click="changePage(-1)"><ChevronLeft :size="16" />上一页</button>
-            <button :disabled="appPage >= totalPages" @click="changePage(1)">下一页<ChevronRight :size="16" /></button>
+            <button :disabled="appPage <= 1" @click="changePage(-1)"><ChevronLeft :size="16" /><span class="page-btn-text">上一页</span></button>
+            <button
+              v-for="p in pageNumbers"
+              :key="p"
+              :class="{ active: appPage === p }"
+              @click="goToPage(p)"
+            >{{ p }}</button>
+            <button :disabled="appPage >= totalPages" @click="changePage(1)"><span class="page-btn-text">下一页</span><ChevronRight :size="16" /></button>
+          </div>
+          <div class="page-jump" v-if="totalPages > 5">
+            <span>跳至</span>
+            <input v-model="jumpPage" type="number" :min="1" :max="totalPages" placeholder="页" @keyup.enter="doJumpPage" />
+            <button @click="doJumpPage">Go</button>
           </div>
         </div>
       </section>
@@ -295,25 +361,26 @@ function roomName(roomId: number) {
         <span class="date-card"><DoorOpen /><b>{{ rooms.length }} 间机房</b><small>实验教学中心</small></span>
       </div>
 
-      <section class="panel approval-panel">
-        <div class="approval-table-wrap">
-          <table class="approval-table room-table">
-            <thead><tr><th>ID</th><th>机房</th><th>楼宇</th><th>座位</th><th>使用单位</th><th>管理员</th><th>联系电话</th><th>简介</th></tr></thead>
-            <tbody>
-              <tr v-for="room in rooms" :key="room.id">
-                <td class="request-id">{{ String(room.id).padStart(2, '0') }}</td>
-                <td><strong>{{ room.name }}</strong></td>
-                <td class="nowrap"><MapPin :size="13" />{{ room.building || '—' }}</td>
-                <td class="people-count">{{ room.seats }}</td>
-                <td>{{ room.audience }}</td>
-                <td class="nowrap">{{ room.administrator || '—' }}</td>
-                <td class="nowrap">{{ room.phone || '—' }}</td>
-                <td class="request-note">{{ room.intro || '—' }}</td>
-              </tr>
-              <tr v-if="!rooms.length"><td colspan="8" class="approval-empty">暂无机房数据</td></tr>
-            </tbody>
-          </table>
-        </div>
+      <section class="room-management-grid">
+        <article v-for="room in rooms" :key="room.id" class="managed-room-card">
+          <div class="managed-room-head">
+            <span class="managed-room-id">{{ String(room.id).padStart(2, '0') }}</span>
+            <div>
+              <h2>{{ room.name }}</h2>
+              <p><MapPin :size="13" />{{ room.building || '—' }}</p>
+            </div>
+            <span class="room-capacity"><Users :size="14" />{{ room.seats }} 座</span>
+          </div>
+          <div class="managed-room-body">
+            <span class="room-owner">{{ room.audience }}</span>
+            <p :class="['room-intro', { muted: !room.intro }]">{{ room.intro || '暂无简介信息' }}</p>
+            <div class="room-contact">
+              <span><Phone :size="14" />管理员：{{ room.administrator || '—' }}</span>
+              <span><Phone :size="14" />电话：{{ room.phone || '—' }}</span>
+            </div>
+          </div>
+        </article>
+        <p v-if="!rooms.length" class="empty" style="grid-column:1/-1">暂无机房数据</p>
       </section>
     </section>
 
