@@ -2,12 +2,12 @@
 import { computed, onMounted, ref } from 'vue'
 import {
   CalendarCheck2, CalendarDays, ChevronLeft, ChevronRight, Clock3, DoorOpen,
-  ListChecks, Phone, Search, Sparkles, UserRound,
+  Layers, Phone, Search, Sparkles, UserRound,
 } from '@lucide/vue'
 import BookingDrawer from '../components/BookingDrawer.vue'
 import RoomRow from '../components/RoomRow.vue'
 import { api } from '../api'
-import { busySlots as fallbackBusy, days as fallbackDays, periods, rooms as fallbackRooms } from '../data'
+import { periods, weekdays } from '../data'
 import type { Room, SelectedSlot } from '../types'
 
 const query = ref('')
@@ -15,17 +15,37 @@ const capacity = ref('全部容量')
 const selected = ref<SelectedSlot[]>([])
 const drawerOpen = ref(false)
 const submitted = ref(false)
+const lastAppId = ref('')
 
-// 以本地占位数据初始化，挂载后尝试用后端真实数据覆盖。
-const roomList = ref<Room[]>(fallbackRooms)
-const busySlots = ref<Set<string>>(fallbackBusy)
+const loading = ref(true)
+const error = ref('')
+const roomList = ref<Room[]>([])
+const busySlots = ref<Set<string>>(new Set())
 const slotInfo = ref<Map<string, { courseName: string }>>(new Map())
-const days = ref(fallbackDays)
-const week = ref(17)
+const week = ref(1)
 const totalWeeks = ref(0)
-const weekLabel = ref('2026.06.21 — 06.27')
-const contact = ref({ name: '王顺利', phone: '15538087393' })
-const pendingCount = ref(2)
+const rangeStart = ref('')
+const rangeEnd = ref('')
+const contact = ref({ name: '', phone: '' })
+
+function addDays(date: string, n: number) {
+  const [y, m, d] = date.split('-').map(Number)
+  const next = new Date(y, m - 1, d + n)
+  return next
+}
+
+// 由当前周的起始日期生成 7 天（含真实日期），与时段表对齐。
+const days = computed(() => {
+  if (!rangeStart.value) return weekdays.map((name) => ({ week: name, date: '' }))
+  return weekdays.map((name, i) => {
+    const date = addDays(rangeStart.value, i)
+    const md = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
+    return { week: name, date: md }
+  })
+})
+
+const weekLabel = computed(() =>
+  rangeStart.value ? `${rangeStart.value.replace(/-/g, '.')} — ${rangeEnd.value.replace(/-/g, '.')}` : '')
 
 const filteredRooms = computed(() => roomList.value.filter((room) => {
   const matchesQuery = `${room.name}${room.building}`.includes(query.value)
@@ -34,16 +54,14 @@ const filteredRooms = computed(() => roomList.value.filter((room) => {
 }))
 
 const freeSlotCount = computed(() =>
-  roomList.value.length * days.value.length * periods.length - busySlots.value.size)
-
-function formatDot(date: string) {
-  return date.replace(/-/g, '.')
-}
+  Math.max(roomList.value.length * 7 * periods.length - busySlots.value.size, 0))
 
 async function loadAvailability(target: number) {
   const data = await api.getAvailability(target)
   week.value = data.week
   totalWeeks.value = data.totalWeeks
+  rangeStart.value = data.range.start
+  rangeEnd.value = data.range.end
   const busy = new Set<string>()
   const info = new Map<string, { courseName: string }>()
   for (const slot of data.slots) {
@@ -52,7 +70,7 @@ async function loadAvailability(target: number) {
   }
   busySlots.value = busy
   slotInfo.value = info
-  weekLabel.value = `${formatDot(data.range.start)} — ${formatDot(data.range.end)}`
+  selected.value = []
 }
 
 async function changeWeek(delta: number) {
@@ -60,20 +78,22 @@ async function changeWeek(delta: number) {
   if (next < 1 || (totalWeeks.value && next > totalWeeks.value)) return
   try {
     await loadAvailability(next)
-  } catch {
-    week.value = next // 后端不可用时仅切换周序号
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '加载失败'
   }
 }
 
 onMounted(async () => {
   try {
     const [config, rooms] = await Promise.all([api.getConfig(), api.getRooms()])
-    if (config.contact.name) contact.value = config.contact
+    contact.value = config.contact
     totalWeeks.value = config.totalWeeks
-    if (rooms.length) roomList.value = rooms
+    roomList.value = rooms
     await loadAvailability(config.currentWeek)
-  } catch {
-    // 后端不可用：保留本地占位数据，界面照常可用。
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '加载失败'
+  } finally {
+    loading.value = false
   }
 })
 
@@ -93,7 +113,10 @@ interface BookingForm {
   remarks: string
 }
 
+const submitError = ref('')
+
 async function handleSubmit(form: BookingForm) {
+  submitError.value = ''
   const slots = selected.value.map((slot) => ({
     roomId: slot.room.id,
     week: week.value,
@@ -101,11 +124,12 @@ async function handleSubmit(form: BookingForm) {
     period: slot.period,
   }))
   try {
-    await api.submitApplication({ ...form, slots })
-  } catch {
-    // 后端不可用时仍展示提交成功，作为占位演示。
+    const res = await api.submitApplication({ ...form, slots })
+    lastAppId.value = res.id
+    submitted.value = true
+  } catch (err) {
+    submitError.value = err instanceof Error ? err.message : '提交失败，请稍后再试'
   }
-  submitted.value = true
 }
 
 function finishBooking() {
@@ -126,7 +150,7 @@ function finishBooking() {
       <div class="hero-stats">
         <div><span class="stat-icon mint"><DoorOpen /></span><strong>{{ roomList.length }}</strong><small>开放机房</small></div>
         <div><span class="stat-icon amber"><Clock3 /></span><strong>{{ freeSlotCount }}</strong><small>本周空闲时段</small></div>
-        <div><span class="stat-icon lilac"><ListChecks /></span><strong>{{ pendingCount }}</strong><small>进行中的申请</small></div>
+        <div><span class="stat-icon lilac"><Layers /></span><strong>{{ busySlots.size }}</strong><small>本周已排课程</small></div>
       </div>
     </section>
 
@@ -146,19 +170,23 @@ function finishBooking() {
         </select>
         <div class="legend"><span><i class="free" />空闲</span><span><i class="busy" />已占用</span></div>
       </div>
-      <div class="room-list">
-        <RoomRow
-          v-for="room in filteredRooms"
-          :key="room.id"
-          :room="room"
-          :selected="selected"
-          :busy-slots="busySlots"
-          :slot-info="slotInfo"
-          :days="days"
-          @toggle="(day, period) => toggleSlot(room, day, period)"
-        />
-      </div>
-      <div v-if="!filteredRooms.length" class="empty"><Search /><h3>没有找到符合条件的机房</h3><p>试试调整关键词或容量筛选。</p></div>
+      <div v-if="loading" class="empty"><Clock3 /><h3>正在加载机房数据…</h3></div>
+      <div v-else-if="error" class="empty"><Search /><h3>数据加载失败</h3><p>{{ error }}</p></div>
+      <template v-else>
+        <div class="room-list">
+          <RoomRow
+            v-for="room in filteredRooms"
+            :key="room.id"
+            :room="room"
+            :selected="selected"
+            :busy-slots="busySlots"
+            :slot-info="slotInfo"
+            :days="days"
+            @toggle="(day, period) => toggleSlot(room, day, period)"
+          />
+        </div>
+        <div v-if="!filteredRooms.length" class="empty"><Search /><h3>没有找到符合条件的机房</h3><p>试试调整关键词或容量筛选。</p></div>
+      </template>
     </section>
 
     <div v-if="selected.length" class="selection-bar">
@@ -167,7 +195,7 @@ function finishBooking() {
       <button class="primary" @click="drawerOpen = true">填写预约信息</button>
     </div>
 
-    <aside class="portal-contact" :class="{ raised: selected.length }" aria-label="联系人信息">
+    <aside v-if="contact.name" class="portal-contact" :class="{ raised: selected.length }" aria-label="联系人信息">
       <span class="portal-contact-icon"><Phone /></span>
       <div><small><UserRound />首页联系人</small><strong>{{ contact.name }}</strong><a :href="`tel:${contact.phone}`">{{ contact.phone }}</a></div>
     </aside>
@@ -175,7 +203,10 @@ function finishBooking() {
     <BookingDrawer
       v-if="drawerOpen && selected.length"
       :values="selected"
+      :days="days"
       :submitted="submitted"
+      :application-id="lastAppId"
+      :error="submitError"
       @close="drawerOpen = false"
       @submit="handleSubmit"
       @finish="finishBooking"

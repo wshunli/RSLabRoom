@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { reactive } from 'vue'
 import { Check, ChevronRight, Monitor, X } from '@lucide/vue'
-import { days, periods } from '../data'
+import { periods } from '../data'
 import type { SelectedSlot } from '../types'
 
-const props = defineProps<{ values: SelectedSlot[]; submitted: boolean }>()
+const props = defineProps<{
+  values: SelectedSlot[]
+  days: { week: string; date: string }[]
+  submitted: boolean
+  applicationId: string
+  error: string
+}>()
 const emit = defineEmits<{
   close: []
   submit: [form: BookingForm]
@@ -45,7 +51,7 @@ function submitForm() {
       </div>
       <div v-if="submitted" class="success">
         <span><Check /></span><h2>申请已提交</h2>
-        <p>申请编号 AP2026062409，管理员审核后会通过站内消息通知你。</p>
+        <p>申请编号 {{ applicationId }}，管理员审核后会通过站内消息通知你。</p>
         <button class="primary" @click="emit('finish')">完成</button>
       </div>
       <form v-else @submit.prevent="submitForm">
@@ -66,6 +72,7 @@ function submitForm() {
         </div>
         <label>需用软件<input v-model.trim="form.requiredSoftware" name="requiredSoftware" placeholder="请填写课程所需软件" required></label>
         <label>备注信息（上课时间段）<textarea v-model.trim="form.remarks" name="remarks" placeholder="可补充具体上课时间、特殊设备需求等信息" /></label>
+        <p v-if="error" class="login-error">{{ error }}</p>
         <button class="primary submit" type="submit">确认提交申请 <ChevronRight :size="18" /></button>
       </form>
     </aside>

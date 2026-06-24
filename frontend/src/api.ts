@@ -1,8 +1,7 @@
 // 前端 API 客户端：集中声明与后端 /api 的接口及参数。
 //
-// 设计原则：
-// - 所有接口的参数在此完整声明（即使后端暂以占位实现，参数也保留）。
-// - 调用方（视图）负责在请求失败时回退到本地占位数据，保证离线/未接后端时界面可用。
+// 所有数据均来自后端真实接口；请求失败时由调用方（视图）展示错误/空状态，
+// 不再使用本地模拟数据。
 
 import type { AdminUser, BookingRequest, Room } from './types'
 
@@ -130,23 +129,33 @@ export const api = {
     body: JSON.stringify(payload),
   }),
 
-  // ---- 占位接口（后端暂未持久化，参数已保留） -------------------------------
+  // ---- 用户（由 submit 申请人聚合，只读） -----------------------------------
   getUsers: () => request<Array<{
-    id: number; name: string; phone: string; unit: string; role: string; enabled: boolean
+    id: number; name: string; phone: string; applications: number; lastCourse: string
   }>>('/admin/users'),
 
-  getSchedules: () => request<{ rules: unknown[]; placeholder?: boolean; note?: string }>('/admin/schedules'),
+  // ---- 机房排期（生成真实 borrow 占用，btimeid 以 SCH 前缀标记） -------------
+  getSchedules: () => request<ScheduleView[]>('/admin/schedules'),
 
   addSchedule: (payload: {
     courseName: string; roomId: number; weekday: number; period: number
     startWeek: number; endWeek: number; recurrence: 'weekly' | 'odd' | 'even'
-  }) => request<{ accepted: boolean; persisted: boolean }>('/admin/schedules', {
+  }) => request<ScheduleView & { skipped: number }>('/admin/schedules', {
     method: 'POST',
     body: JSON.stringify(payload),
   }),
 
-  deleteSchedule: (id: number) =>
-    request<{ accepted: boolean; persisted: boolean }>(`/admin/schedules/${id}`, { method: 'DELETE' }),
+  deleteSchedule: (id: string) =>
+    request<{ id: string; deleted: number }>(`/admin/schedules/${id}`, { method: 'DELETE' }),
+}
+
+export interface ScheduleView {
+  id: string
+  courseName: string
+  roomId: number
+  weekday: number
+  period: number
+  weeks: number
 }
 
 export type Api = typeof api

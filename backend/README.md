@@ -49,6 +49,8 @@ npm run dev      # node --watch，开发热重载
 | POST | `/api/admin/applications/:id/reject` | 驳回/撤销（置 status=0） |
 | DELETE | `/api/admin/applications/:id` | 删除申请及其占用 |
 | GET / PUT | `/api/admin/settings` | 读写学期与联系人配置（console 表） |
+| GET | `/api/admin/users` | 申请人列表（按 submit 的姓名+电话聚合，含申请次数） |
+| GET / POST / DELETE | `/api/admin/schedules` | 机房排期：生成/查询/删除真实占用 |
 
 ## 历史库与字段映射
 
@@ -61,15 +63,12 @@ npm run dev      # node --watch，开发热重载
 | 学期/联系人配置 | `console`（`begtime/week/lianxiren/lianxidianhua`） |
 | 管理员账号 | `user`（`upwd` = md5 密码） |
 
-## 受历史表结构限制、暂以占位实现的接口
+## 历史表结构带来的取舍
 
-历史库无对应表，接口已保留参数，待新增表后再持久化：
+历史库无独立的排期规则表与用户档案表，新后端在不改表结构的前提下基于现有表实现：
 
-| 方法 | 路径 | 现状 |
-| --- | --- | --- |
-| GET | `/api/admin/users` | 从 submit 申请人聚合的只读列表；单位/角色/启用状态为占位，不可持久化 |
-| GET / POST / DELETE | `/api/admin/schedules` | 历史库按日期逐条存 borrow，无“每周/单周/双周”重复规则表；接口接收参数但不持久化 |
+- **机房排期**：一条排期落地为一组“已通过”的 `borrow` 占用，同组共用一个以 `SCH` 前缀标记的 `btimeid`，便于按组回查与删除。生成时若目标时段已有已通过占用则自动跳过，避免重复排课。它与预约共用同一套占用检测，会即时反映在 `/api/availability`。
+- **用户管理**：历史库无普通用户档案，`/api/admin/users` 按 `submit` 的「姓名 + 电话」聚合出只读的申请人列表（含申请次数、最近课程）。
+- **机房设备（equipment）**：历史库未存储，`/api/rooms` 返回空数组，前端按需兜底展示。
 
-此外，机房“设备（equipment）”历史库未存储，`/api/rooms` 中返回空数组占位，前端可用默认标签兜底。
-
-> 说明：历史库没有独立的“已驳回”状态，驳回与撤销都将状态置回 `0`（待审）。
+> 说明：历史库没有独立的「已驳回」状态，驳回与撤销都将状态置回 `0`（待审）。

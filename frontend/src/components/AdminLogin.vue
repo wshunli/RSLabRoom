@@ -24,13 +24,7 @@ async function submit() {
     sessionStorage.setItem('room-admin-token', token)
     emit('success', user)
   } catch (err) {
-    // 网络不可达（后端未启动）时回退到占位登录，保证静态演示可用；
-    // 若是后端返回的认证失败，则提示具体错误。
-    if (err instanceof TypeError) {
-      emit('success', { username: name, displayName: name })
-    } else {
-      error.value = err instanceof Error ? err.message : '登录失败'
-    }
+    error.value = err instanceof Error ? err.message : '登录失败，请检查网络或账号密码'
   } finally {
     loading.value = false
   }

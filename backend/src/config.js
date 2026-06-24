@@ -4,7 +4,7 @@
 // 默认值即为目标数据库的连接信息，可按需用环境变量覆盖（便于本地开发）。
 
 export const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
+  host: process.env.DB_HOST || '10.101.242.104',
   port: Number(process.env.DB_PORT || 3306),
   user: process.env.DB_USER || 'halladmin',
   password: process.env.DB_PASSWORD ?? 'LES8sZsdqNmRNHxe',

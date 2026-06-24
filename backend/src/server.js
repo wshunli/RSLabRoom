@@ -300,37 +300,116 @@ app.put('/api/admin/settings', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true })
 }))
 
-// ---- 占位接口（历史库无对应表，保留参数供后续接入） ------------------------
+// ---- 用户（由 submit 申请人聚合，只读） ------------------------------------
 
-// 用户管理：历史库仅有管理员账号表（user），无普通用户档案。
-// 这里从 submit 表中聚合申请人作为只读占位列表；启用/停用/删除无法持久化。
+// 历史库无普通用户档案表，这里以申请人（姓名 + 电话）聚合出真实的用户列表。
 app.get('/api/admin/users', requireAdmin, wrap(async (_req, res) => {
   const rows = await query(
-    'SELECT sperson, sphone, MIN(sid) AS sid FROM submit GROUP BY sperson, sphone ORDER BY sid',
+    `SELECT sperson, sphone, COUNT(*) AS applications, MIN(sid) AS sid,
+            SUBSTRING_INDEX(GROUP_CONCAT(sname ORDER BY sid DESC SEPARATOR '\\n'), '\\n', 1) AS lastCourse
+       FROM submit
+      WHERE sperson <> ''
+      GROUP BY sperson, sphone
+      ORDER BY applications DESC, sid`,
   )
   res.json(rows.map((r) => ({
     id: r.sid,
     name: r.sperson,
     phone: r.sphone,
-    unit: '—',        // 占位：历史库未存储单位
-    role: '教师',      // 占位：历史库未存储角色
-    enabled: true,    // 占位：无启用状态字段
-    placeholder: true,
+    applications: Number(r.applications),
+    lastCourse: r.lastCourse || '',
   })))
 }))
 
-// 机房排期规则：历史库按日期逐条存 borrow，无“每周/单周/双周”重复规则表。
-// 接口保留参数，当前不持久化，返回占位说明。
-app.get('/api/admin/schedules', requireAdmin, (_req, res) => {
-  res.json({ rules: [], placeholder: true, note: '历史库无排期规则表，前端使用占位数据。' })
-})
-app.post('/api/admin/schedules', requireAdmin, (req, res) => {
-  // 期望 body: { courseName, roomId, weekday, period, startWeek, endWeek, recurrence }
-  res.status(202).json({ accepted: true, persisted: false, rule: req.body, placeholder: true })
-})
-app.delete('/api/admin/schedules/:id', requireAdmin, (req, res) => {
-  res.status(202).json({ accepted: true, persisted: false, id: req.params.id, placeholder: true })
-})
+// ---- 机房排期（生成真实 borrow 占用） --------------------------------------
+//
+// 历史库无“重复规则”表，排期以一组已通过的 borrow 占用落地，
+// 同一条排期的所有占用共用一个以 'SCH' 前缀标记的 btimeid，便于回查与删除。
+
+function weekMatchesRecurrence(week, recurrence) {
+  if (recurrence === 'odd') return week % 2 === 1
+  if (recurrence === 'even') return week % 2 === 0
+  return true
+}
+
+// GET /api/admin/schedules —— 列出已生成的排期（按 btimeid 归并）。
+app.get('/api/admin/schedules', requireAdmin, wrap(async (_req, res) => {
+  const c = await loadConsole()
+  const begtime = c.begtime || formatDate(new Date())
+  const rows = await query(
+    `SELECT btimeid, MIN(bname) AS bname, bclassid, tag,
+            COUNT(*) AS weeks, MIN(btime) AS firstDate
+       FROM borrow
+      WHERE btimeid LIKE 'SCH%'
+      GROUP BY btimeid, bclassid, tag
+      ORDER BY MIN(btime)`,
+  )
+  res.json(rows.map((r) => ({
+    id: r.btimeid,
+    courseName: r.bname,
+    roomId: r.bclassid,
+    weekday: ((dayIndexOf(begtime, 1, r.firstDate) % 7) + 7) % 7,
+    period: Number(r.tag) - 1,
+    weeks: Number(r.weeks),
+  })))
+}))
+
+// POST /api/admin/schedules
+// body: { courseName, roomId, weekday, period, startWeek, endWeek, recurrence }
+app.post('/api/admin/schedules', requireAdmin, wrap(async (req, res) => {
+  const { courseName, roomId, weekday, period, startWeek, endWeek, recurrence = 'weekly' } = req.body || {}
+  if (!courseName || roomId == null || weekday == null || period == null || !startWeek || !endWeek) {
+    return res.status(400).json({ error: '缺少必要的排期参数' })
+  }
+  if (Number(startWeek) > Number(endWeek)) {
+    return res.status(400).json({ error: '结束周不能早于开始周' })
+  }
+
+  const c = await loadConsole()
+  const begtime = c.begtime || formatDate(new Date())
+  const tag = periodToTag(period)
+  const batchId = `SCH${Date.now()}${Math.floor(Math.random() * 1000)}`
+
+  let created = 0
+  let skipped = 0
+  for (let week = Number(startWeek); week <= Number(endWeek); week++) {
+    if (!weekMatchesRecurrence(week, recurrence)) continue
+    const date = slotDate(begtime, week, Number(weekday))
+    // 已存在已通过占用则跳过，避免重复排课。
+    const clash = await queryOne(
+      'SELECT bid FROM borrow WHERE status = 1 AND btime = ? AND bclassid = ? AND tag = ?',
+      [date, Number(roomId), tag],
+    )
+    if (clash) { skipped++; continue }
+    await query(
+      `INSERT INTO borrow
+        (btimeid, bperson, bname, btime, tag, bclassid, status, bphone, bsoftware, bnumer, bmore)
+        VALUES (?, '排期', ?, ?, ?, ?, 1, '', '', '', '')`,
+      [batchId, courseName, date, tag, Number(roomId)],
+    )
+    created++
+  }
+
+  res.status(201).json({
+    id: batchId,
+    courseName,
+    roomId: Number(roomId),
+    weekday: Number(weekday),
+    period: Number(period),
+    weeks: created,
+    skipped,
+  })
+}))
+
+// DELETE /api/admin/schedules/:id —— 删除整条排期生成的占用。
+app.delete('/api/admin/schedules/:id', requireAdmin, wrap(async (req, res) => {
+  const id = req.params.id
+  if (!id.startsWith('SCH')) {
+    return res.status(400).json({ error: '非法的排期编号' })
+  }
+  const result = await query('DELETE FROM borrow WHERE btimeid = ?', [id])
+  res.json({ id, deleted: result.affectedRows ?? 0 })
+}))
 
 // ---- 健康检查 ---------------------------------------------------------------
 

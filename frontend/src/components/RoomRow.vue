@@ -1,19 +1,15 @@
 <script setup lang="ts">
 import { MapPin, Users } from '@lucide/vue'
-import { busySlots as fallbackBusySlots, days as fallbackDays, periods } from '../data'
+import { periods } from '../data'
 import type { Room, SelectedSlot } from '../types'
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   room: Room
   selected: SelectedSlot[]
-  busySlots?: Set<string>
-  slotInfo?: Map<string, { courseName: string }>
-  days?: { week: string; date: string }[]
-}>(), {
-  busySlots: () => fallbackBusySlots,
-  slotInfo: () => new Map(),
-  days: () => fallbackDays,
-})
+  busySlots: Set<string>
+  slotInfo: Map<string, { courseName: string }>
+  days: { week: string; date: string }[]
+}>()
 const emit = defineEmits<{ toggle: [day: number, period: number] }>()
 
 function isBusy(day: number, period: number) {
