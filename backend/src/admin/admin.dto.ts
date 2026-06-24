@@ -54,3 +54,42 @@ export class CreateScheduleDto {
   @IsIn(['weekly', 'odd', 'even'])
   recurrence: 'weekly' | 'odd' | 'even' = 'weekly'
 }
+
+export class CreateUserDto {
+  @IsString() @IsNotEmpty() @MaxLength(20)
+  username: string
+
+  @IsString() @IsNotEmpty() @MaxLength(200)
+  password: string
+}
+
+export class UpdateUserDto {
+  @IsString() @IsNotEmpty() @MaxLength(20)
+  username: string
+
+  @IsOptional() @IsString() @IsNotEmpty() @MaxLength(200)
+  password?: string
+}
+
+export class RoomDto {
+  @IsString() @IsNotEmpty() @MaxLength(100)
+  name: string
+
+  @IsString() @MaxLength(100)
+  building: string
+
+  @Type(() => Number) @IsInt() @Min(0) @Max(10000)
+  seats: number
+
+  @IsString() @MaxLength(100)
+  audience: string
+
+  @IsString() @MaxLength(200)
+  intro: string
+
+  @IsString() @MaxLength(100)
+  administrator: string
+
+  @IsString() @MaxLength(50)
+  phone: string
+}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { CalendarDays, Clock3, DoorOpen, Trash2 } from '@lucide/vue'
 import { api, type ScheduleView } from '../../api'
 import { periods, weekdays } from '../../data'
@@ -16,6 +16,10 @@ const scheduleForm = reactive({
 })
 
 const scheduledRoomCount = computed(() => new Set(scheduleRules.value.map((rule) => rule.roomId)).size)
+
+watch(() => adminStore.rooms, (rooms) => {
+  if (rooms.length && !rooms.some((room) => room.id === scheduleForm.roomId)) scheduleForm.roomId = rooms[0].id
+}, { immediate: true, deep: true })
 
 function roomName(roomId: number) {
   return adminStore.rooms.find((room) => room.id === roomId)?.name || '未知机房'
@@ -61,7 +65,7 @@ onMounted(async () => {
 <template>
   <section class="admin-main schedule-management-page">
     <div class="admin-title">
-      <div><span class="kicker">SEMESTER SCHEDULE</span><h1>机房排期</h1><p>按教学周生成机房占用，一条规则可覆盖多周课程。</p></div>
+      <div><span class="kicker">BATCH RESERVATION</span><h1>批量预约（排期）</h1><p>按教学周一次新增多条预约，批次与预约明细分别存储。</p></div>
       <span class="date-card"><CalendarDays /><b>当前学期</b><small>共 {{ semesterWeeks }} 周</small></span>
     </div>
 
@@ -87,19 +91,20 @@ onMounted(async () => {
     </section>
 
     <section class="panel schedule-rules-panel">
-      <div class="panel-head"><div><h2>学期排期</h2><p>当前共 {{ scheduleRules.length }} 条排期。</p></div></div>
+      <div class="panel-head"><div><h2>批量预约记录</h2><p>当前共 {{ scheduleRules.length }} 个批次。</p></div></div>
       <div class="approval-table-wrap">
         <table class="approval-table schedule-rules-table">
-          <thead><tr><th>课程名称</th><th>机房</th><th>上课时间</th><th>占用周数</th><th>操作</th></tr></thead>
+          <thead><tr><th>课程名称</th><th>机房</th><th>上课时间</th><th>周次范围</th><th>成功预约</th><th>操作</th></tr></thead>
           <tbody>
             <tr v-for="rule in scheduleRules" :key="rule.id">
               <td><strong>{{ rule.courseName }}</strong></td>
               <td>{{ roomName(rule.roomId) }}</td>
               <td>{{ weekdays[rule.weekday] }} · {{ periods[rule.period] }}</td>
-              <td><span class="week-range">{{ rule.weeks }} 周</span></td>
+              <td><span class="week-range">{{ rule.startWeek || '—' }}–{{ rule.endWeek || '—' }} 周 · {{ rule.recurrence === 'odd' ? '单周' : rule.recurrence === 'even' ? '双周' : '每周' }}</span></td>
+              <td>{{ rule.weeks }} 条<span v-if="rule.skipped" class="schedule-skip">（跳过 {{ rule.skipped }}）</span></td>
               <td><div class="approval-actions"><button class="delete" @click="deleteScheduleRule(rule.id)"><Trash2 />删除</button></div></td>
             </tr>
-            <tr v-if="!scheduleRules.length"><td colspan="5" class="approval-empty">暂无排期</td></tr>
+            <tr v-if="!scheduleRules.length"><td colspan="6" class="approval-empty">暂无批量预约记录</td></tr>
           </tbody>
         </table>
       </div>

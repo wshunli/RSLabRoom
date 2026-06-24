@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '../auth/auth.guard'
 import { AdminService } from './admin.service'
-import { ApplicationQueryDto, CreateScheduleDto, UpdateSettingsDto } from './admin.dto'
+import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
 
 @Controller('api/admin')
 @UseGuards(AuthGuard)
@@ -28,6 +28,27 @@ export class AdminController {
 
   @Get('users')
   getUsers() { return this.service.getUsers() }
+
+  @Post('users')
+  createUser(@Body() body: CreateUserDto) { return this.service.createUser(body) }
+
+  @Put('users/:username')
+  updateUser(@Param('username') username: string, @Body() body: UpdateUserDto) { return this.service.updateUser(username, body) }
+
+  @Delete('users/:username')
+  deleteUser(@Param('username') username: string) { return this.service.deleteUser(username) }
+
+  @Get('rooms')
+  getRooms() { return this.service.getRooms() }
+
+  @Post('rooms')
+  createRoom(@Body() body: RoomDto) { return this.service.createRoom(body) }
+
+  @Put('rooms/:id')
+  updateRoom(@Param('id') id: string, @Body() body: RoomDto) { return this.service.updateRoom(id, body) }
+
+  @Delete('rooms/:id')
+  deleteRoom(@Param('id') id: string) { return this.service.deleteRoom(id) }
 
   @Get('schedules')
   getSchedules() { return this.service.getSchedules() }

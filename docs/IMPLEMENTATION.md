@@ -21,6 +21,10 @@ applications 借用申请、用途、人数、状态、审批意见
 audit_logs   审批及关键配置的审计记录
 ```
 
+当前兼容历史库的实现中，`schedules` 保存一次批量预约（排期）的规则与执行结果，
+实际生成的每个预约时段仍写入 `borrow`，两者通过 `schedules.id = borrow.btimeid`
+关联。部署新版管理功能前需执行 `db/002_admin_crud_and_schedules.sql`。
+
 不要在前端通过“先查询空闲、再新增申请”判断冲突。后端应对
 `room_id + date + period` 建立唯一占用约束，并在事务中完成审批和占用写入，
 否则两位用户同时申请时会发生重复预约。

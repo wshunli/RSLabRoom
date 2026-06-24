@@ -1,10 +1,10 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { DatabaseService } from '../database/database.service'
 import { rowToRoom } from '../shared/rooms'
-import { dayIndexOf, formatDate, parseDate, PERIOD_NAMES, periodToTag, slotDate } from '../shared/time'
-import { ApplicationQueryDto, CreateScheduleDto, UpdateSettingsDto } from './admin.dto'
+import { formatDate, parseDate, PERIOD_NAMES, periodToTag, slotDate } from '../shared/time'
+import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
 
 const STATE_BY_CODE: Record<number, string> = { 0: 'pending', 1: 'approved' }
 const SCHEDULING_LOCK = 'rslabroom:scheduling'
@@ -145,24 +145,96 @@ export class AdminService {
 
   async getUsers() {
     const rows = await this.database.query<RowDataPacket[]>('SELECT username FROM user ORDER BY username')
-    return rows.map((row, index) => ({ id: index + 1, username: row.username }))
+    return rows.map((row) => ({ id: row.username, username: row.username, role: '管理员' }))
+  }
+
+  async createUser(body: CreateUserDto) {
+    const existing = await this.database.queryOne<RowDataPacket>('SELECT username FROM user WHERE username = ?', [body.username])
+    if (existing) throw new ConflictException({ error: '账号已存在' })
+    await this.database.query('INSERT INTO user (username, upwd) VALUES (?, ?)', [
+      body.username, createHash('md5').update(body.password).digest('hex'),
+    ])
+    return { id: body.username, username: body.username, role: '管理员' }
+  }
+
+  async updateUser(currentUsername: string, body: UpdateUserDto) {
+    const existing = await this.database.queryOne<RowDataPacket>('SELECT username FROM user WHERE username = ?', [currentUsername])
+    if (!existing) throw new NotFoundException({ error: '账号不存在' })
+    if (body.username !== currentUsername) {
+      const duplicate = await this.database.queryOne<RowDataPacket>('SELECT username FROM user WHERE username = ?', [body.username])
+      if (duplicate) throw new ConflictException({ error: '新账号名已存在' })
+    }
+    if (body.password) {
+      await this.database.query('UPDATE user SET username = ?, upwd = ? WHERE username = ?', [
+        body.username, createHash('md5').update(body.password).digest('hex'), currentUsername,
+      ])
+    } else {
+      await this.database.query('UPDATE user SET username = ? WHERE username = ?', [body.username, currentUsername])
+    }
+    return { id: body.username, username: body.username, role: '管理员' }
+  }
+
+  async deleteUser(username: string) {
+    const count = await this.database.queryOne<RowDataPacket>('SELECT COUNT(*) AS total FROM user')
+    if (Number(count?.total) <= 1) throw new BadRequestException({ error: '至少需要保留一个管理员账号' })
+    const result = await this.database.query<ResultSetHeader>('DELETE FROM user WHERE username = ?', [username])
+    if (!result.affectedRows) throw new NotFoundException({ error: '账号不存在' })
+    return { id: username, deleted: true }
+  }
+
+  async getRooms() {
+    const rows = await this.database.query<RowDataPacket[]>('SELECT cid, cname, cintro FROM class ORDER BY cid')
+    return rows.map((row) => rowToRoom({ cid: Number(row.cid), cname: String(row.cname), cintro: String(row.cintro) }))
+  }
+
+  private roomColumns(body: RoomDto) {
+    const location = [body.building.trim(), body.name.trim()].filter(Boolean).join('-')
+    const suffix = `（${body.seats}座，${body.audience || '实验教学中心'}）`
+    const cname = `${location}${suffix}`
+    const cintro = [body.intro, `机位：${body.seats}`, `管理员：${body.administrator}`, `联系电话：${body.phone}`].filter(Boolean).join('\n')
+    return { cname, cintro }
+  }
+
+  async createRoom(body: RoomDto) {
+    const { cname, cintro } = this.roomColumns(body)
+    const result = await this.database.query<ResultSetHeader>('INSERT INTO class (cintro, cname) VALUES (?, ?)', [cintro, cname])
+    return rowToRoom({ cid: result.insertId, cname, cintro })
+  }
+
+  async updateRoom(idValue: string, body: RoomDto) {
+    const id = Number(idValue)
+    if (!Number.isInteger(id) || id < 1) throw new BadRequestException({ error: '非法的机房编号' })
+    const { cname, cintro } = this.roomColumns(body)
+    const result = await this.database.query<ResultSetHeader>('UPDATE class SET cintro = ?, cname = ? WHERE cid = ?', [cintro, cname, id])
+    if (!result.affectedRows) throw new NotFoundException({ error: '机房不存在' })
+    return rowToRoom({ cid: id, cname, cintro })
+  }
+
+  async deleteRoom(idValue: string) {
+    const id = Number(idValue)
+    if (!Number.isInteger(id) || id < 1) throw new BadRequestException({ error: '非法的机房编号' })
+    const used = await this.database.queryOne<RowDataPacket>('SELECT bid FROM borrow WHERE bclassid = ? LIMIT 1', [id])
+    if (used) throw new ConflictException({ error: '该机房已有预约记录，不能删除' })
+    const scheduled = await this.database.queryOne<RowDataPacket>('SELECT id FROM schedules WHERE room_id = ? LIMIT 1', [id])
+    if (scheduled) throw new ConflictException({ error: '该机房已有排期记录，不能删除' })
+    const result = await this.database.query<ResultSetHeader>('DELETE FROM class WHERE cid = ?', [id])
+    if (!result.affectedRows) throw new NotFoundException({ error: '机房不存在' })
+    return { id, deleted: true }
   }
 
   async getSchedules() {
-    const config = await this.loadConsole()
-    const semesterStart = config.begtime || formatDate(new Date())
-    const rows = await this.database.query<RowDataPacket[]>(
-      `SELECT btimeid, MIN(bname) AS bname, bclassid, tag, COUNT(*) AS weeks, MIN(btime) AS firstDate
-         FROM borrow WHERE btimeid LIKE 'SCH%'
-        GROUP BY btimeid, bclassid, tag ORDER BY MIN(btime)`,
-    )
+    const rows = await this.database.query<RowDataPacket[]>('SELECT * FROM schedules ORDER BY created_at DESC')
     return rows.map((row) => ({
-      id: row.btimeid,
-      courseName: row.bname,
-      roomId: row.bclassid,
-      weekday: ((dayIndexOf(semesterStart, 1, row.firstDate) % 7) + 7) % 7,
-      period: Number(row.tag) - 1,
-      weeks: Number(row.weeks),
+      id: row.id,
+      courseName: row.course_name,
+      roomId: Number(row.room_id),
+      weekday: Number(row.weekday),
+      period: Number(row.period),
+      startWeek: Number(row.start_week),
+      endWeek: Number(row.end_week),
+      recurrence: row.recurrence,
+      weeks: Number(row.created_slots),
+      skipped: Number(row.skipped_slots),
     }))
   }
 
@@ -192,16 +264,28 @@ export class AdminService {
         )
         created++
       }
+      await connection.execute(
+        `INSERT INTO schedules
+          (id, course_name, room_id, weekday, period, start_week, end_week, recurrence, created_slots, skipped_slots)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, body.courseName, body.roomId, body.weekday, body.period, body.startWeek, body.endWeek, body.recurrence, created, skipped],
+      )
     })
     return {
       id, courseName: body.courseName, roomId: body.roomId, weekday: body.weekday,
-      period: body.period, weeks: created, skipped,
+      period: body.period, startWeek: body.startWeek, endWeek: body.endWeek,
+      recurrence: body.recurrence, weeks: created, skipped,
     }
   }
 
   async deleteSchedule(id: string) {
     if (!id.startsWith('SCH')) throw new BadRequestException({ error: '非法的排期编号' })
-    const result = await this.database.query<ResultSetHeader>('DELETE FROM borrow WHERE btimeid = ?', [id])
-    return { id, deleted: result.affectedRows }
+    const deleted = await this.database.serializedTransaction(SCHEDULING_LOCK, async (connection) => {
+      const [result] = await connection.execute<ResultSetHeader>('DELETE FROM borrow WHERE btimeid = ?', [id])
+      const [schedule] = await connection.execute<ResultSetHeader>('DELETE FROM schedules WHERE id = ?', [id])
+      if (!schedule.affectedRows) throw new NotFoundException({ error: '排期不存在' })
+      return result.affectedRows
+    })
+    return { id, deleted }
   }
 }

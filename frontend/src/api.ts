@@ -139,8 +139,29 @@ export const api = {
     body: JSON.stringify(payload),
   }),
 
-  // ---- 用户（user 表中的管理员账号，只读） ----------------------------------
-  getUsers: () => request<Array<{ id: number; username: string }>>('/admin/users'),
+  // ---- 用户管理 -------------------------------------------------------------
+  getUsers: () => request<ManagedUser[]>('/admin/users'),
+
+  createUser: (payload: { username: string; password: string }) =>
+    request<ManagedUser>('/admin/users', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateUser: (username: string, payload: { username: string; password?: string }) =>
+    request<ManagedUser>(`/admin/users/${encodeURIComponent(username)}`, { method: 'PUT', body: JSON.stringify(payload) }),
+
+  deleteUser: (username: string) =>
+    request<{ id: string; deleted: boolean }>(`/admin/users/${encodeURIComponent(username)}`, { method: 'DELETE' }),
+
+  // ---- 机房管理 -------------------------------------------------------------
+  getAdminRooms: () => request<Room[]>('/admin/rooms'),
+
+  createRoom: (payload: RoomInput) =>
+    request<Room>('/admin/rooms', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateRoom: (id: number, payload: RoomInput) =>
+    request<Room>(`/admin/rooms/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+
+  deleteRoom: (id: number) =>
+    request<{ id: number; deleted: boolean }>(`/admin/rooms/${id}`, { method: 'DELETE' }),
 
   // ---- 机房排期（生成真实 borrow 占用，btimeid 以 SCH 前缀标记） -------------
   getSchedules: () => request<ScheduleView[]>('/admin/schedules'),
@@ -164,6 +185,22 @@ export interface ScheduleView {
   weekday: number
   period: number
   weeks: number
+  startWeek?: number
+  endWeek?: number
+  recurrence?: 'weekly' | 'odd' | 'even'
+  skipped?: number
+}
+
+export interface ManagedUser {
+  id: string
+  username: string
+  role: string
+}
+
+export type RoomInput = Omit<Room, 'id' | 'equipment'> & {
+  intro: string
+  administrator: string
+  phone: string
 }
 
 export type Api = typeof api

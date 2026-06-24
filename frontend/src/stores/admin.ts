@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
-import type { BookingRequest, Room } from '../types'
-import { api, type ScheduleView } from '../api'
+import type { Room } from '../types'
+import { api } from '../api'
 
 export const adminStore = reactive({
   rooms: [] as Room[],
@@ -8,7 +8,7 @@ export const adminStore = reactive({
 
   async loadRooms() {
     try {
-      this.rooms = await api.getRooms()
+      this.rooms = await api.getAdminRooms()
     } catch {
       this.rooms = []
     }
