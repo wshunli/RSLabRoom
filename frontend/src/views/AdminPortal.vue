@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import {
-  CalendarDays, Check, CircleHelp, Clock3, DoorOpen,
+  CalendarDays, Check, ChevronLeft, ChevronRight, CircleHelp, Clock3, DoorOpen,
   LayoutDashboard, ListChecks, LogOut, MapPin, Phone, Save, Settings2,
-  Trash2, UserRound, Users, X,
+  Trash2, Users, X,
 } from '@lucide/vue'
 import { api, type ScheduleView } from '../api'
 import { periods, weekdays } from '../data'
@@ -14,7 +14,7 @@ const emit = defineEmits<{ logout: [] }>()
 
 const requests = ref<BookingRequest[]>([])
 const rooms = ref<Room[]>([])
-const managedUsers = ref<Array<{ id: number; name: string; phone: string; applications: number; lastCourse: string }>>([])
+const managedUsers = ref<Array<{ id: number; username: string }>>([])
 const scheduleRules = ref<ScheduleView[]>([])
 
 const systemSettings = ref({
@@ -35,11 +35,26 @@ const scheduleForm = reactive({
 })
 
 const active = ref('申请审批')
-const pending = computed(() => requests.value.filter((request) => request.state === 'pending').length)
+
+// 申请审批：状态筛选 + 分页
+type StatusFilter = 'all' | 'pending' | 'approved'
+const appStatus = ref<StatusFilter>('all')
+const appPage = ref(1)
+const appPageSize = ref(10)
+const appTotal = ref(0)
+const pendingTotal = ref(0)
+const appLoading = ref(false)
+const statusOptions: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: '全部' },
+  { value: 'pending', label: '待审批' },
+  { value: 'approved', label: '已通过' },
+]
+
+const totalPages = computed(() => Math.max(1, Math.ceil(appTotal.value / appPageSize.value)))
 const scheduledRoomCount = computed(() => new Set(scheduleRules.value.map((rule) => rule.roomId)).size)
 const navigation = computed(() => [
   { name: '概览', icon: LayoutDashboard },
-  { name: '申请审批', icon: ListChecks, badge: pending.value },
+  { name: '申请审批', icon: ListChecks, badge: pendingTotal.value },
   { name: '机房排期', icon: CalendarDays },
   { name: '机房管理', icon: DoorOpen },
   { name: '用户管理', icon: Users },
@@ -47,18 +62,38 @@ const navigation = computed(() => [
 ])
 
 async function loadApplications() {
-  const list = await api.getApplications('all')
-  requests.value = list.map((item) => ({
-    id: item.id,
-    applicant: item.applicant,
-    phone: item.phone,
-    requiredSoftware: item.requiredSoftware,
-    people: item.people,
-    details: item.details,
-    courseName: item.courseName,
-    remarks: item.remarks,
-    state: item.state,
-  }))
+  appLoading.value = true
+  try {
+    const res = await api.getApplications(appStatus.value, appPage.value, appPageSize.value)
+    requests.value = res.items.map((item) => ({
+      id: item.id,
+      applicant: item.applicant,
+      phone: item.phone,
+      requiredSoftware: item.requiredSoftware,
+      people: item.people,
+      details: item.details,
+      courseName: item.courseName,
+      remarks: item.remarks,
+      state: item.state,
+    }))
+    appTotal.value = res.total
+    pendingTotal.value = res.pendingTotal
+  } finally {
+    appLoading.value = false
+  }
+}
+
+function changeStatus(value: StatusFilter) {
+  appStatus.value = value
+  appPage.value = 1
+  loadApplications()
+}
+
+function changePage(delta: number) {
+  const next = appPage.value + delta
+  if (next < 1 || next > totalPages.value) return
+  appPage.value = next
+  loadApplications()
 }
 
 onMounted(async () => {
@@ -76,12 +111,10 @@ onMounted(async () => {
 })
 
 async function updateRequest(id: string, state: RequestState) {
-  const request = requests.value.find((item) => item.id === id)
-  if (!request) return
   try {
     if (state === 'approved') await api.approveApplication(id)
     else if (state === 'rejected') await api.rejectApplication(id)
-    request.state = state
+    await loadApplications()
   } catch (err) {
     alert(err instanceof Error ? err.message : '操作失败')
   }
@@ -90,7 +123,9 @@ async function updateRequest(id: string, state: RequestState) {
 async function deleteRequest(id: string) {
   try {
     await api.deleteApplication(id)
-    requests.value = requests.value.filter((request) => request.id !== id)
+    // 删除当前页最后一条后若本页空了，回退一页。
+    if (requests.value.length === 1 && appPage.value > 1) appPage.value -= 1
+    await loadApplications()
   } catch (err) {
     alert(err instanceof Error ? err.message : '删除失败')
   }
@@ -153,14 +188,26 @@ function roomName(roomId: number) {
 
     <section v-if="active === '申请审批'" class="admin-main">
       <div class="admin-title">
-        <div><span class="kicker">REQUEST REVIEW</span><h1>申请审批</h1><p>共 {{ requests.length }} 条申请，{{ pending }} 条待处理。</p></div>
+        <div><span class="kicker">REQUEST REVIEW</span><h1>申请审批</h1><p>共 {{ appTotal }} 条申请，{{ pendingTotal }} 条待处理。</p></div>
         <span class="date-card"><CalendarDays /><b>审批管理员</b><small>{{ admin.displayName }}</small></span>
+      </div>
+
+      <div class="admin-toolbar">
+        <div class="status-filter">
+          <span class="filter-label">审批状态</span>
+          <button
+            v-for="opt in statusOptions"
+            :key="opt.value"
+            :class="{ active: appStatus === opt.value }"
+            @click="changeStatus(opt.value)"
+          >{{ opt.label }}</button>
+        </div>
       </div>
 
       <section class="panel approval-panel">
         <div class="approval-table-wrap">
           <table class="approval-table">
-            <thead><tr><th>ID</th><th>姓名</th><th>电话</th><th>需要软件</th><th>学生人数</th><th>详细信息</th><th>课程名称</th><th>备注</th><th>操作</th></tr></thead>
+            <thead><tr><th>ID</th><th>姓名</th><th>电话</th><th>需要软件</th><th>学生人数</th><th>详细信息</th><th>课程名称</th><th>备注</th><th>状态</th><th>操作</th></tr></thead>
             <tbody>
               <tr v-for="request in requests" :key="request.id">
                 <td class="request-id">{{ request.id }}</td>
@@ -171,20 +218,26 @@ function roomName(roomId: number) {
                 <td class="request-detail">{{ request.details }}</td>
                 <td>{{ request.courseName }}</td>
                 <td class="request-note">{{ request.remarks || '—' }}</td>
+                <td><span class="status" :class="request.state">{{ request.state === 'approved' ? '已通过' : '待审批' }}</span></td>
                 <td>
                   <div class="approval-actions">
-                    <template v-if="request.state === 'pending'">
-                      <button class="approve" title="通过" @click="updateRequest(request.id, 'approved')"><Check />通过</button>
-                      <button class="reject" title="驳回" @click="updateRequest(request.id, 'rejected')"><X />驳回</button>
-                    </template>
-                    <span v-else class="status" :class="request.state">{{ request.state === 'approved' ? '已通过' : '已驳回' }}</span>
+                    <button v-if="request.state === 'pending'" class="approve" title="通过" @click="updateRequest(request.id, 'approved')"><Check />通过</button>
+                    <button v-else class="reject" title="撤销" @click="updateRequest(request.id, 'rejected')"><X />撤销</button>
                     <button class="delete" title="删除" @click="deleteRequest(request.id)"><Trash2 />删除</button>
                   </div>
                 </td>
               </tr>
-              <tr v-if="!requests.length"><td colspan="9" class="approval-empty">暂无申请记录</td></tr>
+              <tr v-if="appLoading"><td colspan="10" class="approval-empty">加载中…</td></tr>
+              <tr v-else-if="!requests.length"><td colspan="10" class="approval-empty">暂无申请记录</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="pagination">
+          <span class="page-info">第 {{ appPage }} / {{ totalPages }} 页 · 共 {{ appTotal }} 条</span>
+          <div class="page-controls">
+            <button :disabled="appPage <= 1" @click="changePage(-1)"><ChevronLeft :size="16" />上一页</button>
+            <button :disabled="appPage >= totalPages" @click="changePage(1)">下一页<ChevronRight :size="16" /></button>
+          </div>
         </div>
       </section>
     </section>
@@ -242,45 +295,45 @@ function roomName(roomId: number) {
         <span class="date-card"><DoorOpen /><b>{{ rooms.length }} 间机房</b><small>实验教学中心</small></span>
       </div>
 
-      <div class="room-management-grid">
-        <article v-for="room in rooms" :key="room.id" class="managed-room-card">
-          <div class="managed-room-head">
-            <span class="managed-room-id">{{ String(room.id).padStart(2, '0') }}</span>
-            <div><h2>{{ room.name }}</h2><p><MapPin />{{ room.building }}</p></div>
-            <span class="room-capacity"><Users />{{ room.seats }} 座</span>
-          </div>
-          <div class="managed-room-body">
-            <span class="room-owner">{{ room.audience }}</span>
-            <p class="room-intro" :class="{ muted: !room.intro }">{{ room.intro || '暂无机房简介' }}</p>
-            <div class="room-contact">
-              <span><UserRound />管理员：{{ room.administrator || '暂未设置' }}</span>
-              <span><Phone />联系电话：{{ room.phone || '暂未设置' }}</span>
-            </div>
-          </div>
-        </article>
-        <div v-if="!rooms.length" class="empty"><DoorOpen /><h3>暂无机房数据</h3></div>
-      </div>
+      <section class="panel approval-panel">
+        <div class="approval-table-wrap">
+          <table class="approval-table room-table">
+            <thead><tr><th>ID</th><th>机房</th><th>楼宇</th><th>座位</th><th>使用单位</th><th>管理员</th><th>联系电话</th><th>简介</th></tr></thead>
+            <tbody>
+              <tr v-for="room in rooms" :key="room.id">
+                <td class="request-id">{{ String(room.id).padStart(2, '0') }}</td>
+                <td><strong>{{ room.name }}</strong></td>
+                <td class="nowrap"><MapPin :size="13" />{{ room.building || '—' }}</td>
+                <td class="people-count">{{ room.seats }}</td>
+                <td>{{ room.audience }}</td>
+                <td class="nowrap">{{ room.administrator || '—' }}</td>
+                <td class="nowrap">{{ room.phone || '—' }}</td>
+                <td class="request-note">{{ room.intro || '—' }}</td>
+              </tr>
+              <tr v-if="!rooms.length"><td colspan="8" class="approval-empty">暂无机房数据</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </section>
 
     <section v-else-if="active === '用户管理'" class="admin-main">
       <div class="admin-title">
-        <div><span class="kicker">USER MANAGEMENT</span><h1>用户管理</h1><p>共 {{ managedUsers.length }} 位申请人，按历史申请记录聚合。</p></div>
-        <span class="date-card"><Users /><b>{{ managedUsers.length }} 位用户</b><small>申请人</small></span>
+        <div><span class="kicker">USER MANAGEMENT</span><h1>用户管理</h1><p>共 {{ managedUsers.length }} 个管理员账号。</p></div>
+        <span class="date-card"><Users /><b>{{ managedUsers.length }} 个账号</b><small>管理员</small></span>
       </div>
 
       <section class="panel approval-panel">
         <div class="approval-table-wrap">
           <table class="approval-table user-table">
-            <thead><tr><th>ID</th><th>姓名</th><th>电话</th><th>申请次数</th><th>最近课程</th></tr></thead>
+            <thead><tr><th>ID</th><th>账号</th><th>角色</th></tr></thead>
             <tbody>
               <tr v-for="user in managedUsers" :key="user.id">
                 <td class="request-id">{{ user.id }}</td>
-                <td><strong>{{ user.name }}</strong></td>
-                <td class="nowrap">{{ user.phone }}</td>
-                <td class="people-count">{{ user.applications }}</td>
-                <td>{{ user.lastCourse || '—' }}</td>
+                <td><strong>{{ user.username }}</strong></td>
+                <td>管理员</td>
               </tr>
-              <tr v-if="!managedUsers.length"><td colspan="5" class="approval-empty">暂无用户记录</td></tr>
+              <tr v-if="!managedUsers.length"><td colspan="3" class="approval-empty">暂无账号记录</td></tr>
             </tbody>
           </table>
         </div>

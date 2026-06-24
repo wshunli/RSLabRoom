@@ -33,3 +33,20 @@
 @media(max-width:620px){.settings-form{padding:20px}.setting-row{grid-template-columns:1fr;gap:7px}.date-fields{gap:6px}.date-fields input{width:74px}.date-fields span:nth-child(2) input,.date-fields span:nth-child(3) input{width:58px}.settings-footer{justify-content:space-between}}
 @media(max-width:620px){.schedule-week-switch{width:100%;justify-content:space-between}.schedule-summary>article{flex:1;min-width:130px}.schedule-hint{flex-wrap:wrap}.schedule-hint small{width:100%}}
 @media(max-width:700px){.schedule-rule-form{grid-template-columns:1fr 1fr;padding:18px}.schedule-rule-form .course-field{grid-column:1/-1}.schedule-rule-form>.primary{grid-column:1/-1}.schedule-guidance{min-width:100%}}
+/* 申请审批：状态筛选 + 分页；机房列表 */
+.status.pending{background:#fdf0dd;color:#9a6a16}
+.admin-toolbar{display:flex;align-items:center;gap:14px;margin:22px 0 0;flex-wrap:wrap}
+.status-filter{display:flex;align-items:center;gap:8px}
+.status-filter .filter-label{font-size:12px;color:var(--muted);margin-right:2px}
+.status-filter button{border:1px solid var(--line);background:#fff;color:#5d6b64;border-radius:8px;padding:7px 14px;font-size:12px}
+.status-filter button:hover{border-color:#c8d9d1}
+.status-filter button.active{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
+.pagination{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-top:1px solid var(--line);flex-wrap:wrap;gap:10px}
+.pagination .page-info{font-size:12px;color:var(--muted)}
+.pagination .page-controls{display:flex;gap:8px}
+.pagination .page-controls button{display:flex;align-items:center;gap:3px;border:1px solid var(--line);background:#fff;color:#4d5a54;border-radius:8px;padding:7px 12px;font-size:12px}
+.pagination .page-controls button:hover:not(:disabled){border-color:#c8d9d1;color:var(--green)}
+.pagination .page-controls button:disabled{opacity:.45;cursor:not-allowed}
+.room-table{min-width:900px}
+.room-table .nowrap svg{vertical-align:-2px;margin-right:3px;color:var(--green)}
+.room-table .request-note{min-width:200px;max-width:320px;white-space:normal}

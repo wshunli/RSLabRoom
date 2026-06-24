@@ -22,6 +22,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     },
   })
   if (!res.ok) {
+    // 已登录状态下收到 401，说明 token 失效：清理会话并通知 App 回到登录。
+    if (res.status === 401 && sessionStorage.getItem('room-admin-token')) {
+      sessionStorage.removeItem('room-admin-token')
+      sessionStorage.removeItem('room-admin')
+      window.dispatchEvent(new CustomEvent('admin-unauthorized'))
+    }
     let message = `请求失败 (${res.status})`
     try {
       const body = await res.json()
@@ -92,11 +98,15 @@ export const api = {
 
   adminLogout: () => request<{ ok: boolean }>('/admin/logout', { method: 'POST' }),
 
-  // ---- 申请审批 -------------------------------------------------------------
-  getApplications: (status: 'pending' | 'approved' | 'all' = 'all') =>
-    request<Array<BookingRequest & { sid: number; detailList: string[] }>>(
-      `/admin/applications?status=${status}`,
-    ),
+  // ---- 申请审批（分页 + 状态筛选） ------------------------------------------
+  getApplications: (status: 'pending' | 'approved' | 'all' = 'all', page = 1, pageSize = 10) =>
+    request<{
+      items: Array<BookingRequest & { sid: number; detailList: string[] }>
+      total: number
+      page: number
+      pageSize: number
+      pendingTotal: number
+    }>(`/admin/applications?status=${status}&page=${page}&pageSize=${pageSize}`),
 
   approveApplication: (id: string) =>
     request<{ id: string; state: string }>(`/admin/applications/${id}/approve`, { method: 'POST' }),
@@ -129,10 +139,8 @@ export const api = {
     body: JSON.stringify(payload),
   }),
 
-  // ---- 用户（由 submit 申请人聚合，只读） -----------------------------------
-  getUsers: () => request<Array<{
-    id: number; name: string; phone: string; applications: number; lastCourse: string
-  }>>('/admin/users'),
+  // ---- 用户（user 表中的管理员账号，只读） ----------------------------------
+  getUsers: () => request<Array<{ id: number; username: string }>>('/admin/users'),
 
   // ---- 机房排期（生成真实 borrow 占用，btimeid 以 SCH 前缀标记） -------------
   getSchedules: () => request<ScheduleView[]>('/admin/schedules'),

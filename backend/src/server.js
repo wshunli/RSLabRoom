@@ -189,20 +189,31 @@ async function buildDetails(stimeid) {
   })
 }
 
-// GET /api/admin/applications?status=pending|approved|all
+// GET /api/admin/applications?status=pending|approved|all&page=1&pageSize=10
+// 返回分页结果：{ items, total, page, pageSize, pendingTotal }
 app.get('/api/admin/applications', requireAdmin, wrap(async (req, res) => {
   const status = String(req.query.status || 'all')
-  let sql = 'SELECT sid, stimeid, sperson, sphone, ssoftware, snumer, sname, smore, sstatus FROM submit'
-  const params = []
-  if (status === 'pending') { sql += ' WHERE sstatus = 0' }
-  else if (status === 'approved') { sql += ' WHERE sstatus = 1' }
-  sql += ' ORDER BY sid DESC'
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+  const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize, 10) || 10))
 
-  const rows = await query(sql, params)
-  const result = []
+  let where = ''
+  if (status === 'pending') where = ' WHERE sstatus = 0'
+  else if (status === 'approved') where = ' WHERE sstatus = 1'
+
+  const countRow = await queryOne(`SELECT COUNT(*) AS total FROM submit${where}`)
+  const total = Number(countRow.total)
+  const offset = (page - 1) * pageSize
+
+  // page/pageSize 已校验为整数，直接内联避免 execute 对 LIMIT 占位符的限制。
+  const rows = await query(
+    `SELECT sid, stimeid, sperson, sphone, ssoftware, snumer, sname, smore, sstatus
+       FROM submit${where} ORDER BY sid DESC LIMIT ${pageSize} OFFSET ${offset}`,
+  )
+
+  const items = []
   for (const row of rows) {
     const details = await buildDetails(row.stimeid)
-    result.push({
+    items.push({
       id: row.stimeid,
       sid: row.sid,
       applicant: row.sperson,
@@ -216,7 +227,9 @@ app.get('/api/admin/applications', requireAdmin, wrap(async (req, res) => {
       state: STATE_BY_CODE[row.sstatus] || 'pending',
     })
   }
-  res.json(result)
+
+  const pendingRow = await queryOne('SELECT COUNT(*) AS c FROM submit WHERE sstatus = 0')
+  res.json({ items, total, page, pageSize, pendingTotal: Number(pendingRow.c) })
 }))
 
 // POST /api/admin/applications/:id/approve —— 通过（含时段冲突检查，对齐历史 access 逻辑）。
@@ -300,25 +313,12 @@ app.put('/api/admin/settings', requireAdmin, wrap(async (req, res) => {
   res.json({ ok: true })
 }))
 
-// ---- 用户（由 submit 申请人聚合，只读） ------------------------------------
+// ---- 用户（user 表，管理员账号，只读） ------------------------------------
 
-// 历史库无普通用户档案表，这里以申请人（姓名 + 电话）聚合出真实的用户列表。
+// 直接读取 user 表中的账号；绝不返回密码字段 upwd。
 app.get('/api/admin/users', requireAdmin, wrap(async (_req, res) => {
-  const rows = await query(
-    `SELECT sperson, sphone, COUNT(*) AS applications, MIN(sid) AS sid,
-            SUBSTRING_INDEX(GROUP_CONCAT(sname ORDER BY sid DESC SEPARATOR '\\n'), '\\n', 1) AS lastCourse
-       FROM submit
-      WHERE sperson <> ''
-      GROUP BY sperson, sphone
-      ORDER BY applications DESC, sid`,
-  )
-  res.json(rows.map((r) => ({
-    id: r.sid,
-    name: r.sperson,
-    phone: r.sphone,
-    applications: Number(r.applications),
-    lastCourse: r.lastCourse || '',
-  })))
+  const rows = await query('SELECT username FROM user ORDER BY username')
+  res.json(rows.map((r, i) => ({ id: i + 1, username: r.username })))
 }))
 
 // ---- 机房排期（生成真实 borrow 占用） --------------------------------------
