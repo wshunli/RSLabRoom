@@ -13,12 +13,13 @@ export const days = [
 export const periods = ['上午', '下午', '晚上']
 
 export const rooms: Room[] = [
-  { id: 1, name: '318 机房', building: '信息学部 5 号楼', seats: 52, audience: '遥感学院', equipment: ['图形工作站', '投影', '空调'] },
-  { id: 2, name: '325 机房', building: '信息学部 5 号楼', seats: 48, audience: '遥感学院', equipment: ['高性能电脑', '投影', '空调'] },
-  { id: 3, name: '221 机房', building: '信息学部 5 号楼', seats: 48, audience: '遥感学院', equipment: ['双屏工位', '投影', '空调'] },
-  { id: 4, name: '220 机房', building: '信息学部 5 号楼', seats: 48, audience: '本科生院', equipment: ['教学终端', '投影', '空调'] },
+  { id: 1, name: '318 机房', building: '5 号楼', seats: 52, audience: '遥感学院', equipment: ['图形工作站', '投影', '空调'], intro: '地理信息与国情监测实验室', administrator: '孙朝晖', phone: '13707145509' },
+  { id: 2, name: '325 机房', building: '5 号楼', seats: 48, audience: '遥感学院', equipment: ['高性能电脑', '投影', '空调'], intro: '全数字摄影测量实验室', administrator: '徐宏平', phone: '13971404255' },
+  { id: 3, name: '221 机房', building: '5 号楼', seats: 48, audience: '遥感学院', equipment: ['双屏工位', '投影', '空调'], intro: '遥感大数据高性能处理机房', administrator: '徐宏平', phone: '13971404255' },
+  { id: 4, name: '220 机房', building: '5 号楼', seats: 48, audience: '本科生院', equipment: ['教学终端', '投影', '空调'] },
   { id: 5, name: '201 机房', building: '附 3 楼', seats: 81, audience: '本科生院', equipment: ['大容量机房', '电子白板', '空调'] },
   { id: 6, name: '202 机房', building: '附 3 楼', seats: 42, audience: '本科生院', equipment: ['教学终端', '投影', '空调'] },
+  { id: 7, name: '203 机房', building: '附 3 楼', seats: 62, audience: '本科生院', equipment: ['教学终端', '投影', '空调'] },
 ]
 
 const mondayFirstBusySlots = [
@@ -35,7 +36,7 @@ export const busySlots = new Set(mondayFirstBusySlots.map((slot) => {
 }))
 
 export const initialRequests: BookingRequest[] = [
-  { id: 'AP2026062108', applicant: '陈雨欣', unit: '遥感科学与技术系', room: '318 机房', date: '2026-06-25', period: '晚上 18:00–22:00', purpose: '遥感影像处理课程小组实验', people: 36, state: 'pending' },
-  { id: 'AP2026062107', applicant: '李明泽', unit: '测绘工程系', room: '202 机房', date: '2026-06-26', period: '下午 14:00–18:00', purpose: '本科生创新项目数据处理', people: 28, state: 'pending' },
-  { id: 'AP2026062006', applicant: '王老师', unit: '空间信息工程系', room: '201 机房', date: '2026-06-23', period: '上午 08:00–12:00', purpose: 'GIS 开发课程补充实验', people: 64, state: 'approved' },
+  { id: 'AP2026062108', applicant: '陈雨欣', phone: '138 0000 1208', requiredSoftware: 'ENVI、ArcGIS Pro', people: 36, details: '318 机房 · 2026-06-25 · 晚上 18:00–22:00', courseName: '遥感影像处理', remarks: '需要提前安装课程数据包', state: 'pending' },
+  { id: 'AP2026062107', applicant: '李明泽', phone: '139 0000 2107', requiredSoftware: 'Python、PyCharm', people: 28, details: '202 机房 · 2026-06-26 · 下午 14:00–18:00', courseName: '空间数据分析', remarks: '本科生创新项目课程', state: 'pending' },
+  { id: 'AP2026062006', applicant: '王老师', phone: '136 0000 2006', requiredSoftware: 'QGIS、PostgreSQL', people: 64, details: '201 机房 · 2026-06-23 · 上午 08:00–12:00', courseName: 'GIS 开发课程', remarks: '请开放教师机投屏权限', state: 'approved' },
 ]

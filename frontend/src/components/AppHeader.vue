@@ -21,7 +21,7 @@ function selectMode(value: PortalMode) {
     <nav :class="{ open: mobileNav }">
       <button :class="{ active: mode === 'user' }" @click="selectMode('user')">预约大厅</button>
       <button :class="{ active: mode === 'guide' }" @click="selectMode('guide')">使用指南</button>
-      <button v-if="admin" :class="{ active: mode === 'admin' }" @click="selectMode('admin')">管理工作台</button>
+      <button v-if="admin" :class="{ active: mode === 'admin' }" @click="selectMode('admin')">管理后台</button>
     </nav>
     <div class="top-actions">
       <template v-if="admin">

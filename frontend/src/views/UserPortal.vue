@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import {
   CalendarCheck2, CalendarDays, ChevronLeft, ChevronRight, Clock3, DoorOpen,
-  ListChecks, Search, Sparkles,
+  ListChecks, Phone, Search, Sparkles, UserRound,
 } from '@lucide/vue'
 import BookingDrawer from '../components/BookingDrawer.vue'
 import RoomRow from '../components/RoomRow.vue'
@@ -83,6 +83,11 @@ function finishBooking() {
       <button class="clear-selection" @click="selected = []">清空</button>
       <button class="primary" @click="drawerOpen = true">填写预约信息</button>
     </div>
+
+    <aside class="portal-contact" :class="{ raised: selected.length }" aria-label="联系人信息">
+      <span class="portal-contact-icon"><Phone /></span>
+      <div><small><UserRound />首页联系人</small><strong>王顺利</strong><a href="tel:15538087393">15538087393</a></div>
+    </aside>
 
     <BookingDrawer
       v-if="drawerOpen && selected.length"

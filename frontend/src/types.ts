@@ -13,17 +13,20 @@ export interface Room {
   seats: number
   audience: string
   equipment: string[]
+  intro?: string
+  administrator?: string
+  phone?: string
 }
 
 export interface BookingRequest {
   id: string
   applicant: string
-  unit: string
-  room: string
-  date: string
-  period: string
-  purpose: string
+  phone: string
+  requiredSoftware: string
   people: number
+  details: string
+  courseName: string
+  remarks: string
   state: RequestState
 }
 
