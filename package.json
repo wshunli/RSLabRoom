@@ -9,15 +9,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
-    "lucide-react": "latest",
+    "@lucide/vue": "^1.21.0",
+    "@vitejs/plugin-vue": "^6.0.7",
     "vite": "latest",
-    "react": "latest",
-    "react-dom": "latest"
+    "vue": "^3.5.38"
   },
   "devDependencies": {
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
     "typescript": "latest"
   }
 }
