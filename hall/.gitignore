@@ -1,0 +1,8 @@
+
+# Editor and manual backup copies
+/**/*.bak
+
+# Bundled editor examples and documentation (not used by the application)
+/demo/
+/docs/
+/simple_demo.html
