@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer'
-import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator'
+import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator'
 
 export class ApplicationQueryDto {
   @IsOptional() @IsIn(['pending', 'approved', 'all'])
@@ -33,26 +33,58 @@ export class UpdateSettingsDto {
 }
 
 export class CreateScheduleDto {
+  // 排课公用信息，与首页预约大厅提交字段保持一致
+  @IsString() @IsNotEmpty() @MaxLength(10)
+  applicantName: string
+
+  @IsString() @IsNotEmpty() @MaxLength(25)
+  phone: string
+
+  @Type(() => Number) @IsInt() @Min(1) @Max(9999)
+  attendees: number
+
   @IsString() @IsNotEmpty() @MaxLength(50)
   courseName: string
+
+  @IsString() @MaxLength(200)
+  requiredSoftware = ''
+
+  @IsString() @MaxLength(100)
+  remarks = ''
 
   @Type(() => Number) @IsInt() @Min(1)
   roomId: number
 
-  @Type(() => Number) @IsInt() @Min(0) @Max(6)
-  weekday: number
-
   @Type(() => Number) @IsInt() @Min(0) @Max(2)
   period: number
 
+  @IsIn(['weekly', 'daily'])
+  mode: 'weekly' | 'daily' = 'weekly'
+
+  // 起止周次，两种模式都按周次选择
   @Type(() => Number) @IsInt() @Min(1) @Max(60)
   startWeek: number
 
   @Type(() => Number) @IsInt() @Min(1) @Max(60)
   endWeek: number
 
+  // 每周模式：指定星期与重复方式（单/双/每周）
+  @ValidateIf((o) => o.mode !== 'daily')
+  @Type(() => Number) @IsInt() @Min(0) @Max(6)
+  weekday: number
+
+  @ValidateIf((o) => o.mode !== 'daily')
   @IsIn(['weekly', 'odd', 'even'])
   recurrence: 'weekly' | 'odd' | 'even' = 'weekly'
+
+  // 每天模式：开始周/结束周各自指定周几，逐天生成区间内每一天
+  @ValidateIf((o) => o.mode === 'daily')
+  @Type(() => Number) @IsInt() @Min(0) @Max(6)
+  startWeekday: number
+
+  @ValidateIf((o) => o.mode === 'daily')
+  @Type(() => Number) @IsInt() @Min(0) @Max(6)
+  endWeekday: number
 }
 
 export class CreateUserDto {

@@ -163,32 +163,18 @@ export const api = {
   deleteRoom: (id: number) =>
     request<{ id: number; deleted: boolean }>(`/admin/rooms/${id}`, { method: 'DELETE' }),
 
-  // ---- 机房排期（生成真实 borrow 占用，btimeid 以 SCH 前缀标记） -------------
-  getSchedules: () => request<ScheduleView[]>('/admin/schedules'),
-
+  // ---- 批量排期（生成普通申请：borrow + submit，进入「预约审批」流程） ---------
   addSchedule: (payload: {
-    courseName: string; roomId: number; weekday: number; period: number
-    startWeek: number; endWeek: number; recurrence: 'weekly' | 'odd' | 'even'
-  }) => request<ScheduleView & { skipped: number }>('/admin/schedules', {
+    applicantName: string; phone: string; attendees: number
+    courseName: string; requiredSoftware: string; remarks: string
+    roomId: number; period: number; mode: 'weekly' | 'daily'
+    startWeek: number; endWeek: number
+    weekday?: number; recurrence?: 'weekly' | 'odd' | 'even'
+    startWeekday?: number; endWeekday?: number
+  }) => request<{ id: string; weeks: number; skipped: number; state: string }>('/admin/schedules', {
     method: 'POST',
     body: JSON.stringify(payload),
   }),
-
-  deleteSchedule: (id: string) =>
-    request<{ id: string; deleted: number }>(`/admin/schedules/${id}`, { method: 'DELETE' }),
-}
-
-export interface ScheduleView {
-  id: string
-  courseName: string
-  roomId: number
-  weekday: number
-  period: number
-  weeks: number
-  startWeek?: number
-  endWeek?: number
-  recurrence?: 'weekly' | 'odd' | 'even'
-  skipped?: number
 }
 
 export interface ManagedUser {

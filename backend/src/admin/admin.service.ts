@@ -215,42 +215,25 @@ export class AdminService {
     if (!Number.isInteger(id) || id < 1) throw new BadRequestException({ error: '非法的机房编号' })
     const used = await this.database.queryOne<RowDataPacket>('SELECT bid FROM borrow WHERE bclassid = ? LIMIT 1', [id])
     if (used) throw new ConflictException({ error: '该机房已有预约记录，不能删除' })
-    const scheduled = await this.database.queryOne<RowDataPacket>('SELECT id FROM schedules WHERE room_id = ? LIMIT 1', [id])
-    if (scheduled) throw new ConflictException({ error: '该机房已有排期记录，不能删除' })
     const result = await this.database.query<ResultSetHeader>('DELETE FROM class WHERE cid = ?', [id])
     if (!result.affectedRows) throw new NotFoundException({ error: '机房不存在' })
     return { id, deleted: true }
   }
 
-  async getSchedules() {
-    const rows = await this.database.query<RowDataPacket[]>('SELECT * FROM schedules ORDER BY created_at DESC')
-    return rows.map((row) => ({
-      id: row.id,
-      courseName: row.course_name,
-      roomId: Number(row.room_id),
-      weekday: Number(row.weekday),
-      period: Number(row.period),
-      startWeek: Number(row.start_week),
-      endWeek: Number(row.end_week),
-      recurrence: row.recurrence,
-      weeks: Number(row.created_slots),
-      skipped: Number(row.skipped_slots),
-    }))
-  }
-
+  // 批量排期不再单独记录批次表，而是生成一条普通申请（borrow + submit，待审批），
+  // 直接进入「预约审批」流程，与首页预约提交一致。
   async createSchedule(body: CreateScheduleDto) {
-    if (body.startWeek > body.endWeek) throw new BadRequestException({ error: '结束周不能早于开始周' })
     const config = await this.loadConsole()
     const semesterStart = config.begtime || formatDate(new Date())
-    const id = `SCH${Date.now()}${randomUUID().replaceAll('-', '').slice(0, 8)}`
+    const dates = body.mode === 'daily'
+      ? this.dailyDates(body, semesterStart)
+      : this.weeklyDates(body, semesterStart)
+    const id = `${Date.now()}${randomUUID().replaceAll('-', '').slice(0, 8)}`
+    const tag = periodToTag(body.period)
     let created = 0
     let skipped = 0
     await this.database.serializedTransaction(SCHEDULING_LOCK, async (connection) => {
-      for (let week = body.startWeek; week <= body.endWeek; week++) {
-        if (body.recurrence === 'odd' && week % 2 === 0) continue
-        if (body.recurrence === 'even' && week % 2 === 1) continue
-        const date = slotDate(semesterStart, week, body.weekday)
-        const tag = periodToTag(body.period)
+      for (const date of dates) {
         const [conflicts] = await connection.execute<RowDataPacket[]>(
           'SELECT bid FROM borrow WHERE status = 1 AND btime = ? AND bclassid = ? AND tag = ? LIMIT 1',
           [date, body.roomId, tag],
@@ -259,33 +242,44 @@ export class AdminService {
         await connection.execute(
           `INSERT INTO borrow
             (btimeid, bperson, bname, btime, tag, bclassid, status, bphone, bsoftware, bnumer, bmore)
-           VALUES (?, '排期', ?, ?, ?, ?, 1, '', '', '', '')`,
-          [id, body.courseName, date, tag, body.roomId],
+           VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+          [id, body.applicantName, body.courseName, date, tag, body.roomId,
+            body.phone, body.requiredSoftware, String(body.attendees), body.remarks],
         )
         created++
       }
-      await connection.execute(
-        `INSERT INTO schedules
-          (id, course_name, room_id, weekday, period, start_week, end_week, recurrence, created_slots, skipped_slots)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, body.courseName, body.roomId, body.weekday, body.period, body.startWeek, body.endWeek, body.recurrence, created, skipped],
-      )
+      if (created > 0) {
+        await connection.execute(
+          `INSERT INTO submit
+            (stimeid, sperson, sphone, ssoftware, snumer, sname, smore, sstatus)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+          [id, body.applicantName, body.phone, body.requiredSoftware, String(body.attendees), body.courseName, body.remarks],
+        )
+      }
     })
-    return {
-      id, courseName: body.courseName, roomId: body.roomId, weekday: body.weekday,
-      period: body.period, startWeek: body.startWeek, endWeek: body.endWeek,
-      recurrence: body.recurrence, weeks: created, skipped,
-    }
+    return { id, weeks: created, skipped, state: 'pending' }
   }
 
-  async deleteSchedule(id: string) {
-    if (!id.startsWith('SCH')) throw new BadRequestException({ error: '非法的排期编号' })
-    const deleted = await this.database.serializedTransaction(SCHEDULING_LOCK, async (connection) => {
-      const [result] = await connection.execute<ResultSetHeader>('DELETE FROM borrow WHERE btimeid = ?', [id])
-      const [schedule] = await connection.execute<ResultSetHeader>('DELETE FROM schedules WHERE id = ?', [id])
-      if (!schedule.affectedRows) throw new NotFoundException({ error: '排期不存在' })
-      return result.affectedRows
-    })
-    return { id, deleted }
+  private weeklyDates(body: CreateScheduleDto, semesterStart: string): string[] {
+    if (body.startWeek > body.endWeek) throw new BadRequestException({ error: '结束周不能早于开始周' })
+    const dates: string[] = []
+    for (let week = body.startWeek; week <= body.endWeek; week++) {
+      if (body.recurrence === 'odd' && week % 2 === 0) continue
+      if (body.recurrence === 'even' && week % 2 === 1) continue
+      dates.push(slotDate(semesterStart, week, body.weekday))
+    }
+    return dates
+  }
+
+  // 每天模式：从「开始周·周几」到「结束周·周几」，区间内逐天生成
+  private dailyDates(body: CreateScheduleDto, semesterStart: string): string[] {
+    const start = parseDate(slotDate(semesterStart, body.startWeek, body.startWeekday))
+    const end = parseDate(slotDate(semesterStart, body.endWeek, body.endWeekday))
+    if (start.getTime() > end.getTime()) throw new BadRequestException({ error: '结束时间不能早于开始时间' })
+    const dates: string[] = []
+    for (const cursor = new Date(start); cursor.getTime() <= end.getTime(); cursor.setDate(cursor.getDate() + 1)) {
+      dates.push(formatDate(cursor))
+    }
+    return dates
   }
 }

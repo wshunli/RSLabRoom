@@ -50,12 +50,6 @@ export class AdminController {
   @Delete('rooms/:id')
   deleteRoom(@Param('id') id: string) { return this.service.deleteRoom(id) }
 
-  @Get('schedules')
-  getSchedules() { return this.service.getSchedules() }
-
   @Post('schedules')
   createSchedule(@Body() body: CreateScheduleDto) { return this.service.createSchedule(body) }
-
-  @Delete('schedules/:id')
-  deleteSchedule(@Param('id') id: string) { return this.service.deleteSchedule(id) }
 }
