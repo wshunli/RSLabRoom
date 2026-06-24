@@ -1,221 +1,39 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import {
-  CalendarDays, Check, ChevronLeft, ChevronRight, CircleHelp, Clock3, DoorOpen,
-  LayoutDashboard, ListChecks, LogOut, MapPin, Phone, Save, Settings2,
-  Trash2, Users, X,
+  CalendarDays, CircleHelp, DoorOpen,
+  LayoutDashboard, ListChecks, LogOut, Settings2, Users,
 } from '@lucide/vue'
-import { api, type ScheduleView } from '../api'
-import { periods, weekdays } from '../data'
-import type { BookingRequest, RequestState, Room } from '../types'
+import { adminStore } from '../stores/admin'
 
 defineProps<{ admin: { displayName: string } }>()
 const emit = defineEmits<{ logout: [] }>()
 
-const requests = ref<BookingRequest[]>([])
-const rooms = ref<Room[]>([])
-const managedUsers = ref<Array<{ id: number; username: string }>>([])
-const scheduleRules = ref<ScheduleView[]>([])
+const router = useRouter()
+const route = useRoute()
 
-const systemSettings = ref({
-  startYear: new Date().getFullYear(),
-  startMonth: 1,
-  startDay: 1 as number | null,
-  semesterWeeks: 0,
-  contactName: '',
-  contactPhone: '',
-})
-const settingsSaved = ref(false)
-const scheduleError = ref('')
-
-type Recurrence = 'weekly' | 'odd' | 'even'
-const scheduleForm = reactive({
-  courseName: '', roomId: 0, weekday: 1, period: 0,
-  startWeek: 1, endWeek: 18, recurrence: 'weekly' as Recurrence,
+const active = computed(() => {
+  const name = route.name as string
+  return name.replace('admin-', '')
 })
 
-const active = ref('申请审批')
-
-// 申请审批：状态筛选 + 分页
-type StatusFilter = 'all' | 'pending' | 'approved'
-const appStatus = ref<StatusFilter>('all')
-const appPage = ref(1)
-const appPageSize = ref(10)
-const appTotal = ref(0)
-const pendingTotal = ref(0)
-const appLoading = ref(false)
-const appError = ref('')
-const jumpPage = ref('')
-const pageSizeOptions = [5, 10, 15, 20]
-const statusOptions: { value: StatusFilter; label: string }[] = [
-  { value: 'all', label: '全部' },
-  { value: 'pending', label: '待审批' },
-  { value: 'approved', label: '已通过' },
-]
-
-const totalPages = computed(() => Math.max(1, Math.ceil(appTotal.value / appPageSize.value)))
-const pageNumbers = computed(() => {
-  const pages: number[] = []
-  const total = totalPages.value
-  const current = appPage.value
-  let start = Math.max(1, current - 2)
-  let end = Math.min(total, current + 2)
-  if (end - start < 4) {
-    if (start === 1) end = Math.min(total, start + 4)
-    else start = Math.max(1, end - 4)
-  }
-  for (let i = start; i <= end; i++) pages.push(i)
-  return pages
-})
-const scheduledRoomCount = computed(() => new Set(scheduleRules.value.map((rule) => rule.roomId)).size)
 const navigation = computed(() => [
-  { name: '概览', icon: LayoutDashboard },
-  { name: '申请审批', icon: ListChecks, badge: pendingTotal.value },
-  { name: '机房排期', icon: CalendarDays },
-  { name: '机房管理', icon: DoorOpen },
-  { name: '用户管理', icon: Users },
-  { name: '系统设置', icon: Settings2 },
+  { name: '概览', icon: LayoutDashboard, route: 'admin-dashboard' },
+  { name: '申请审批', icon: ListChecks, route: 'admin-approval', badge: adminStore.pendingTotal },
+  { name: '机房排期', icon: CalendarDays, route: 'admin-schedule' },
+  { name: '机房管理', icon: DoorOpen, route: 'admin-rooms' },
+  { name: '用户管理', icon: Users, route: 'admin-users' },
+  { name: '系统设置', icon: Settings2, route: 'admin-settings' },
 ])
 
-async function loadApplications() {
-  appLoading.value = true
-  appError.value = ''
-  try {
-    const res = await api.getApplications(appStatus.value, appPage.value, appPageSize.value)
-    if (!res || !Array.isArray(res.items)) {
-      throw new Error('接口返回数据格式异常，缺少 items 字段')
-    }
-    requests.value = res.items.map((item) => ({
-      id: item.id,
-      applicant: item.applicant,
-      phone: item.phone,
-      requiredSoftware: item.requiredSoftware,
-      people: item.people,
-      details: item.details,
-      courseName: item.courseName,
-      remarks: item.remarks,
-      state: item.state,
-    }))
-    appTotal.value = res.total ?? 0
-    pendingTotal.value = res.pendingTotal ?? 0
-  } catch (err) {
-    appError.value = err instanceof Error ? err.message : '加载申请数据失败'
-    requests.value = []
-    appTotal.value = 0
-  } finally {
-    appLoading.value = false
-  }
+function navigate(name: string) {
+  router.push({ name })
 }
 
-function changeStatus(value: StatusFilter) {
-  appStatus.value = value
-  appPage.value = 1
-  loadApplications()
-}
-
-function changePage(delta: number) {
-  const next = appPage.value + delta
-  if (next < 1 || next > totalPages.value) return
-  appPage.value = next
-  loadApplications()
-}
-
-function goToPage(page: number) {
-  if (page < 1 || page > totalPages.value) return
-  appPage.value = page
-  loadApplications()
-}
-
-function changePageSize(size: number) {
-  appPageSize.value = size
-  appPage.value = 1
-  loadApplications()
-}
-
-function doJumpPage() {
-  const page = parseInt(jumpPage.value, 10)
-  if (isNaN(page) || page < 1 || page > totalPages.value) {
-    alert(`请输入 1~${totalPages.value} 之间的页码`)
-    return
-  }
-  appPage.value = page
-  jumpPage.value = ''
-  loadApplications()
-}
-
-onMounted(async () => {
-  try {
-    rooms.value = await api.getRooms()
-    if (rooms.value.length) scheduleForm.roomId = rooms.value[0].id
-  } catch { /* 机房加载失败，机房相关区块将为空。 */ }
-
-  await Promise.allSettled([
-    loadApplications(),
-    api.getSettings().then((s) => { systemSettings.value = { ...s, startDay: s.startDay } }),
-    api.getUsers().then((u) => { managedUsers.value = u }),
-    api.getSchedules().then((r) => { scheduleRules.value = r }),
-  ])
+onMounted(() => {
+  adminStore.loadRooms()
 })
-
-async function updateRequest(id: string, state: RequestState) {
-  try {
-    if (state === 'approved') await api.approveApplication(id)
-    else if (state === 'rejected') await api.rejectApplication(id)
-    await loadApplications()
-  } catch (err) {
-    alert(err instanceof Error ? err.message : '操作失败')
-  }
-}
-
-async function deleteRequest(id: string) {
-  try {
-    await api.deleteApplication(id)
-    // 删除当前页最后一条后若本页空了，回退一页。
-    if (requests.value.length === 1 && appPage.value > 1) appPage.value -= 1
-    await loadApplications()
-  } catch (err) {
-    alert(err instanceof Error ? err.message : '删除失败')
-  }
-}
-
-async function saveSystemSettings() {
-  settingsSaved.value = false
-  try {
-    await api.updateSettings(systemSettings.value)
-    settingsSaved.value = true
-  } catch (err) {
-    alert(err instanceof Error ? err.message : '保存失败')
-  }
-}
-
-async function addScheduleRule() {
-  scheduleError.value = ''
-  if (scheduleForm.startWeek > scheduleForm.endWeek) {
-    scheduleError.value = '结束周不能早于开始周'
-    return
-  }
-  try {
-    const created = await api.addSchedule({ ...scheduleForm })
-    scheduleRules.value.push(created)
-    if (created.skipped) scheduleError.value = `已生成 ${created.weeks} 个时段，${created.skipped} 个时段因冲突跳过`
-    scheduleForm.courseName = ''
-  } catch (err) {
-    scheduleError.value = err instanceof Error ? err.message : '排期失败'
-  }
-}
-
-async function deleteScheduleRule(id: string) {
-  try {
-    await api.deleteSchedule(id)
-    scheduleRules.value = scheduleRules.value.filter((rule) => rule.id !== id)
-  } catch (err) {
-    alert(err instanceof Error ? err.message : '删除失败')
-  }
-}
-
-function roomName(roomId: number) {
-  return rooms.value.find((room) => room.id === roomId)?.name || '未知机房'
-}
 </script>
 
 <template>
@@ -225,231 +43,17 @@ function roomName(roomId: number) {
       <button
         v-for="item in navigation"
         :key="item.name"
-        :class="{ active: active === item.name }"
-        @click="active = item.name"
+        :class="{ active: active === item.route.replace('admin-', '') }"
+        @click="navigate(item.route)"
       >
         <component :is="item.icon" :size="18" />{{ item.name }}<b v-if="item.badge">{{ item.badge }}</b>
       </button>
-      <div class="side-bottom"><button><CircleHelp :size="18" />帮助与反馈</button><button @click="emit('logout')"><LogOut :size="18" />退出管理端</button></div>
+      <div class="side-bottom">
+        <button><CircleHelp :size="18" />帮助与反馈</button>
+        <button @click="emit('logout')"><LogOut :size="18" />退出管理端</button>
+      </div>
     </aside>
 
-    <section v-if="active === '申请审批'" class="admin-main">
-      <div class="admin-title">
-        <div><span class="kicker">REQUEST REVIEW</span><h1>申请审批</h1><p>共 {{ appTotal }} 条申请，{{ pendingTotal }} 条待处理。</p></div>
-        <span class="date-card"><CalendarDays /><b>审批管理员</b><small>{{ admin.displayName }}</small></span>
-      </div>
-
-      <div class="admin-toolbar">
-        <div class="status-tabs">
-          <button
-            v-for="opt in statusOptions"
-            :key="opt.value"
-            :class="{ active: appStatus === opt.value }"
-            @click="changeStatus(opt.value)"
-          >
-            {{ opt.label }}<b v-if="opt.value === 'pending' && pendingTotal">{{ pendingTotal }}</b>
-          </button>
-        </div>
-      </div>
-
-      <section class="panel approval-panel">
-        <div class="approval-table-wrap">
-          <table class="approval-table">
-            <thead><tr><th>ID</th><th>姓名</th><th>电话</th><th>需要软件</th><th>学生人数</th><th>详细信息</th><th>课程名称</th><th>备注</th><th>状态</th><th>操作</th></tr></thead>
-            <tbody>
-              <tr v-for="request in requests" :key="request.id">
-                <td class="request-id">{{ request.id }}</td>
-                <td><strong>{{ request.applicant }}</strong></td>
-                <td class="nowrap">{{ request.phone }}</td>
-                <td>{{ request.requiredSoftware }}</td>
-                <td class="people-count">{{ request.people }}</td>
-                <td class="request-detail">{{ request.details }}</td>
-                <td>{{ request.courseName }}</td>
-                <td class="request-note">{{ request.remarks || '—' }}</td>
-                <td><span class="status" :class="request.state">{{ request.state === 'approved' ? '已通过' : '待审批' }}</span></td>
-                <td>
-                  <div class="approval-actions">
-                    <button v-if="request.state === 'pending'" class="approve" title="通过" @click="updateRequest(request.id, 'approved')"><Check />通过</button>
-                    <button v-else class="reject" title="撤销" @click="updateRequest(request.id, 'rejected')"><X />撤销</button>
-                    <button class="delete" title="删除" @click="deleteRequest(request.id)"><Trash2 />删除</button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="appLoading"><td colspan="10" class="approval-empty">加载中…</td></tr>
-              <tr v-else-if="appError"><td colspan="10" class="approval-empty" style="color:#b34e3c">{{ appError }}</td></tr>
-              <tr v-else-if="!requests.length"><td colspan="10" class="approval-empty">暂无申请记录</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="pagination">
-          <div class="page-size-selector">
-            <span class="filter-label">每页</span>
-            <select :value="appPageSize" @change="changePageSize(Number(($event.target as HTMLSelectElement).value))">
-              <option v-for="s in pageSizeOptions" :key="s" :value="s">{{ s }} 条</option>
-            </select>
-          </div>
-          <span class="page-info">第 {{ appPage }} / {{ totalPages }} 页 · 共 {{ appTotal }} 条</span>
-          <div class="page-controls">
-            <button :disabled="appPage <= 1" @click="changePage(-1)"><ChevronLeft :size="16" /><span class="page-btn-text">上一页</span></button>
-            <button
-              v-for="p in pageNumbers"
-              :key="p"
-              :class="{ active: appPage === p }"
-              @click="goToPage(p)"
-            >{{ p }}</button>
-            <button :disabled="appPage >= totalPages" @click="changePage(1)"><span class="page-btn-text">下一页</span><ChevronRight :size="16" /></button>
-          </div>
-          <div class="page-jump" v-if="totalPages > 5">
-            <span>跳至</span>
-            <input v-model="jumpPage" type="number" :min="1" :max="totalPages" placeholder="页" @keyup.enter="doJumpPage" />
-            <button @click="doJumpPage">Go</button>
-          </div>
-        </div>
-      </section>
-    </section>
-
-    <section v-else-if="active === '机房排期'" class="admin-main schedule-management-page">
-      <div class="admin-title">
-        <div><span class="kicker">SEMESTER SCHEDULE</span><h1>机房排期</h1><p>按教学周生成机房占用，一条规则可覆盖多周课程。</p></div>
-        <span class="date-card"><CalendarDays /><b>当前学期</b><small>共 {{ systemSettings.semesterWeeks }} 周</small></span>
-      </div>
-
-      <div class="schedule-summary">
-        <article><span class="summary-icon occupied"><Clock3 /></span><div><small>排期条数</small><strong>{{ scheduleRules.length }}</strong></div></article>
-        <article><span class="summary-icon available"><DoorOpen /></span><div><small>已使用机房</small><strong>{{ scheduledRoomCount }} / {{ rooms.length }}</strong></div></article>
-        <div class="schedule-guidance"><strong>说明</strong><span>排期会直接生成已通过的机房占用，与预约共用占用检测；冲突的时段会自动跳过。</span></div>
-      </div>
-
-      <section class="panel schedule-rule-form-panel">
-        <div class="panel-head"><div><h2>新增排期</h2><p>设置一次，自动在所选教学周生成机房占用。</p></div></div>
-        <form class="schedule-rule-form" @submit.prevent="addScheduleRule">
-          <label class="course-field">课程名称<input v-model.trim="scheduleForm.courseName" placeholder="请输入课程名称" required></label>
-          <label>机房<select v-model.number="scheduleForm.roomId"><option v-for="room in rooms" :key="room.id" :value="room.id">{{ room.name }}（{{ room.seats }} 座）</option></select></label>
-          <label>星期<select v-model.number="scheduleForm.weekday"><option v-for="(day, index) in weekdays" :key="day" :value="index">{{ day }}</option></select></label>
-          <label>时段<select v-model.number="scheduleForm.period"><option v-for="(period, index) in periods" :key="period" :value="index">{{ period }}</option></select></label>
-          <label>开始周<input v-model.number="scheduleForm.startWeek" type="number" min="1" :max="systemSettings.semesterWeeks || 30" required></label>
-          <label>结束周<input v-model.number="scheduleForm.endWeek" type="number" min="1" :max="systemSettings.semesterWeeks || 30" required></label>
-          <label>重复方式<select v-model="scheduleForm.recurrence"><option value="weekly">每周</option><option value="odd">单周</option><option value="even">双周</option></select></label>
-          <button class="primary" type="submit" :disabled="!rooms.length">添加排期</button>
-          <p v-if="scheduleError" class="schedule-form-error">{{ scheduleError }}</p>
-        </form>
-      </section>
-
-      <section class="panel schedule-rules-panel">
-        <div class="panel-head"><div><h2>学期排期</h2><p>当前共 {{ scheduleRules.length }} 条排期。</p></div></div>
-        <div class="approval-table-wrap">
-          <table class="approval-table schedule-rules-table">
-            <thead><tr><th>课程名称</th><th>机房</th><th>上课时间</th><th>占用周数</th><th>操作</th></tr></thead>
-            <tbody>
-              <tr v-for="rule in scheduleRules" :key="rule.id">
-                <td><strong>{{ rule.courseName }}</strong></td>
-                <td>{{ roomName(rule.roomId) }}</td>
-                <td>{{ weekdays[rule.weekday] }} · {{ periods[rule.period] }}</td>
-                <td><span class="week-range">{{ rule.weeks }} 周</span></td>
-                <td><div class="approval-actions"><button class="delete" @click="deleteScheduleRule(rule.id)"><Trash2 />删除</button></div></td>
-              </tr>
-              <tr v-if="!scheduleRules.length"><td colspan="5" class="approval-empty">暂无排期</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </section>
-
-    <section v-else-if="active === '机房管理'" class="admin-main">
-      <div class="admin-title">
-        <div><span class="kicker">ROOM MANAGEMENT</span><h1>机房管理</h1><p>共 {{ rooms.length }} 间机房，展示机房基本信息与管理人员联系方式。</p></div>
-        <span class="date-card"><DoorOpen /><b>{{ rooms.length }} 间机房</b><small>实验教学中心</small></span>
-      </div>
-
-      <section class="room-management-grid">
-        <article v-for="room in rooms" :key="room.id" class="managed-room-card">
-          <div class="managed-room-head">
-            <span class="managed-room-id">{{ String(room.id).padStart(2, '0') }}</span>
-            <div>
-              <h2>{{ room.name }}</h2>
-              <p><MapPin :size="13" />{{ room.building || '—' }}</p>
-            </div>
-            <span class="room-capacity"><Users :size="14" />{{ room.seats }} 座</span>
-          </div>
-          <div class="managed-room-body">
-            <span class="room-owner">{{ room.audience }}</span>
-            <p :class="['room-intro', { muted: !room.intro }]">{{ room.intro || '暂无简介信息' }}</p>
-            <div class="room-contact">
-              <span><Phone :size="14" />管理员：{{ room.administrator || '—' }}</span>
-              <span><Phone :size="14" />电话：{{ room.phone || '—' }}</span>
-            </div>
-          </div>
-        </article>
-        <p v-if="!rooms.length" class="empty" style="grid-column:1/-1">暂无机房数据</p>
-      </section>
-    </section>
-
-    <section v-else-if="active === '用户管理'" class="admin-main">
-      <div class="admin-title">
-        <div><span class="kicker">USER MANAGEMENT</span><h1>用户管理</h1><p>共 {{ managedUsers.length }} 个管理员账号。</p></div>
-        <span class="date-card"><Users /><b>{{ managedUsers.length }} 个账号</b><small>管理员</small></span>
-      </div>
-
-      <section class="panel approval-panel">
-        <div class="approval-table-wrap">
-          <table class="approval-table user-table">
-            <thead><tr><th>ID</th><th>账号</th><th>角色</th></tr></thead>
-            <tbody>
-              <tr v-for="user in managedUsers" :key="user.id">
-                <td class="request-id">{{ user.id }}</td>
-                <td><strong>{{ user.username }}</strong></td>
-                <td>管理员</td>
-              </tr>
-              <tr v-if="!managedUsers.length"><td colspan="3" class="approval-empty">暂无账号记录</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </section>
-
-    <section v-else-if="active === '系统设置'" class="admin-main settings-page">
-      <div class="admin-title">
-        <div><span class="kicker">SYSTEM SETTINGS</span><h1>系统设置</h1><p>配置当前学期和预约大厅首页的联系信息。</p></div>
-        <span class="date-card"><Settings2 /><b>基础设置</b><small>管理后台</small></span>
-      </div>
-
-      <form class="panel settings-form" @submit.prevent="saveSystemSettings">
-        <div class="settings-section-head"><CalendarDays /><div><h2>学期设置</h2><p>用于生成机房预约日历和教学周信息。</p></div></div>
-        <div class="setting-row">
-          <label>设置开学时间</label>
-          <div class="date-fields">
-            <span><input v-model.number="systemSettings.startYear" type="number" min="2000" max="2100" required>年</span>
-            <span><input v-model.number="systemSettings.startMonth" type="number" min="1" max="12" required>月</span>
-            <span><input v-model.number="systemSettings.startDay" type="number" min="1" max="31" required>日</span>
-          </div>
-        </div>
-        <div class="setting-row">
-          <label for="semesterWeeks">设置本学期周数</label>
-          <div class="setting-suffix"><input id="semesterWeeks" v-model.number="systemSettings.semesterWeeks" type="number" min="1" max="30" required><span>周</span></div>
-        </div>
-
-        <div class="settings-divider" />
-        <div class="settings-section-head"><Phone /><div><h2>首页联系信息</h2><p>联系方式将展示在预约大厅首页。</p></div></div>
-        <div class="setting-row">
-          <label for="contactName">设置首页联系人姓名</label>
-          <input id="contactName" v-model.trim="systemSettings.contactName" type="text" required>
-        </div>
-        <div class="setting-row">
-          <label for="contactPhone">设置首页联系人电话</label>
-          <input id="contactPhone" v-model.trim="systemSettings.contactPhone" type="tel" required>
-        </div>
-
-        <div class="settings-footer">
-          <span v-if="settingsSaved" class="settings-saved"><Check />设置已保存</span>
-          <button class="primary" type="submit"><Save />提交修改</button>
-        </div>
-      </form>
-    </section>
-
-    <section v-else class="admin-main admin-placeholder">
-      <DoorOpen />
-      <h2>{{ active }}</h2>
-      <p>该模块暂未配置。</p>
-    </section>
+    <router-view />
   </div>
 </template>
