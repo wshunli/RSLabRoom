@@ -14,4 +14,4 @@ npm run dev
 - 普通用户端：查询空闲机房、按时段预约、查看申请入口。
 - 管理工作台：待审批申请、机房动态、审批操作和管理导航。
 
-当前版本使用本地模拟数据，前端技术栈为 React、TypeScript、Vite 和 Lucide Icons。
+当前版本使用本地模拟数据，前端技术栈为 Vue 3、TypeScript、Vite 和 Lucide Icons。界面按视图、通用组件、数据与类型分层组织。
