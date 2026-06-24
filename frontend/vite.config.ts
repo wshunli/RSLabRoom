@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-// 开发期将 /api 代理到本地后端（默认 http://localhost:3001）。
-// 生产环境前后端同域部署，由网关把 /api 转发给后端服务。
+// 开发期将 /api 代理到本地 NestJS（默认 http://localhost:3000）。
+// 生产环境由 NestJS 在同一端口提供前端静态文件与 /api。
 export default defineConfig({
   plugins: [vue()],
   server: {
@@ -11,7 +11,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api': {
-        target: (globalThis as { process?: { env?: Record<string, string> } }).process?.env?.VITE_API_TARGET || 'http://localhost:3001',
+        target: (globalThis as { process?: { env?: Record<string, string> } }).process?.env?.VITE_API_TARGET || 'http://localhost:3000',
         changeOrigin: true,
       },
     },

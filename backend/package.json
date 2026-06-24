@@ -1,17 +1,35 @@
 {
   "name": "rslab-room-backend",
   "private": true,
-  "version": "0.1.0",
-  "type": "module",
-  "description": "新后端 API，连接历史系统 hall 数据库，为 Vue 前端提供 /api 接口。",
-  "main": "src/server.js",
+  "version": "1.0.0",
+  "description": "RSLabRoom NestJS API and Vue static server",
   "scripts": {
-    "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "start:dev": "nest start --watch",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "cors": "^2.8.5",
-    "express": "^4.21.2",
-    "mysql2": "^3.11.5"
+    "@nestjs/common": "^11.1.3",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.3",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/platform-express": "^11.1.3",
+    "@nestjs/serve-static": "^5.0.3",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "helmet": "^8.1.0",
+    "mysql2": "^3.14.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.7",
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.0.3",
+    "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "multer": "^2.2.0"
   }
 }

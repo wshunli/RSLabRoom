@@ -7,38 +7,35 @@
 ```text
 RSLabRoom/
 ├── frontend/   Vue 3 前端应用
-├── backend/    新后端 API（独立开发、同域部署）
+├── backend/    NestJS API 与 Vue 静态文件服务
 ├── db/         数据库脚本
 ├── docs/       设计与实现文档
 └── hall/       历史系统（保持不变）
 ```
 
-前后端代码独立组织，生产环境推荐使用同一域名：Vue 页面部署在 `/`，后端接口统一使用 `/api` 前缀。
+前后端代码独立开发，生产环境由 NestJS 在同一端口提供 Vue 页面和 `/api` 接口。
 
 ## 本地运行
 
-后端（Node.js + Express，独立运行、不依赖 `hall/` 目录；接口与字段映射见 [backend/README.md](backend/README.md)）：
+后端（NestJS，不依赖 `hall/` 目录；配置与部署见 [backend/README.md](backend/README.md)）：
 
 ```bash
-cd backend
-npm install
-npm run dev      # 默认 http://localhost:3001，凭据见 src/config.js（可用环境变量覆盖）
+npm run dev:backend      # 默认 http://localhost:3000
 ```
 
 前端（开发期通过 Vite 代理把 `/api` 转发到后端）：
 
 ```bash
-cd frontend
-npm install
-npm run dev
+npm run dev:frontend
 ```
 
 生产构建：
 
 ```bash
-cd frontend
 npm run build
 ```
+
+生产服务器使用 PM2 时，安装 Node.js LTS 与 PM2 后执行 `npm run deploy`，即可完成依赖安装、前后端构建与进程重启；数据库默认连接沿用历史配置。
 
 系统包含两个可在顶部切换的界面：
 

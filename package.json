@@ -1,0 +1,16 @@
+{
+  "name": "rslab-room",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "install:all": "npm ci --include=dev --prefix frontend && npm ci --include=dev --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "copy:frontend": "node scripts/copy-frontend.mjs",
+    "build:backend": "npm run build --prefix backend",
+    "build": "npm run build:frontend && npm run copy:frontend && npm run build:backend",
+    "deploy": "npm run install:all && npm run build && pm2 startOrRestart ecosystem.config.cjs --env production --update-env",
+    "start": "npm run start --prefix backend",
+    "dev:backend": "npm run start:dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend"
+  }
+}
