@@ -1,13 +1,27 @@
 <script setup lang="ts">
 import { MapPin, Users } from '@lucide/vue'
-import { busySlots, days, periods } from '../data'
+import { busySlots as fallbackBusySlots, days as fallbackDays, periods } from '../data'
 import type { Room, SelectedSlot } from '../types'
 
-const props = defineProps<{ room: Room; selected: SelectedSlot[] }>()
+const props = withDefaults(defineProps<{
+  room: Room
+  selected: SelectedSlot[]
+  busySlots?: Set<string>
+  slotInfo?: Map<string, { courseName: string }>
+  days?: { week: string; date: string }[]
+}>(), {
+  busySlots: () => fallbackBusySlots,
+  slotInfo: () => new Map(),
+  days: () => fallbackDays,
+})
 const emit = defineEmits<{ toggle: [day: number, period: number] }>()
 
 function isBusy(day: number, period: number) {
-  return busySlots.has(`${props.room.id}-${day}-${period}`)
+  return props.busySlots.has(`${props.room.id}-${day}-${period}`)
+}
+
+function courseName(day: number, period: number) {
+  return props.slotInfo.get(`${props.room.id}-${day}-${period}`)?.courseName || '已占用'
 }
 
 function isSelected(day: number, period: number) {
@@ -40,7 +54,7 @@ function isSelected(day: number, period: number) {
           :aria-pressed="isSelected(dayIndex, periodIndex)"
           @click="emit('toggle', dayIndex, periodIndex)"
         >
-          <template v-if="isBusy(dayIndex, periodIndex)"><span>课程</span><small>遥感原理</small></template>
+          <template v-if="isBusy(dayIndex, periodIndex)"><span>课程</span><small>{{ courseName(dayIndex, periodIndex) }}</small></template>
           <template v-else-if="isSelected(dayIndex, periodIndex)"><span>已选择</span><small>再次点击取消</small></template>
           <template v-else><span>空闲</span><small>可预约</small></template>
         </button>

@@ -1,22 +1,39 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Building2, LockKeyhole, UserRound, X } from '@lucide/vue'
+import { api } from '../api'
 import type { AdminUser } from '../types'
 
 const emit = defineEmits<{ close: []; success: [user: AdminUser] }>()
 const username = ref('')
 const password = ref('')
 const error = ref('')
+const loading = ref(false)
 
-function submit() {
+async function submit() {
   error.value = ''
-  if (!username.value.trim() || !password.value) {
+  const name = username.value.trim()
+  if (!name || !password.value) {
     error.value = '请输入管理员账号和密码'
     return
   }
 
-  // 当前项目尚未接入后端认证，保留登录表单交互供 API 接入。
-  emit('success', { username: username.value.trim(), displayName: username.value.trim() })
+  loading.value = true
+  try {
+    const { token, user } = await api.adminLogin(name, password.value)
+    sessionStorage.setItem('room-admin-token', token)
+    emit('success', user)
+  } catch (err) {
+    // 网络不可达（后端未启动）时回退到占位登录，保证静态演示可用；
+    // 若是后端返回的认证失败，则提示具体错误。
+    if (err instanceof TypeError) {
+      emit('success', { username: name, displayName: name })
+    } else {
+      error.value = err instanceof Error ? err.message : '登录失败'
+    }
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -32,7 +49,7 @@ function submit() {
         <label>管理员账号<span><UserRound /><input v-model="username" autocomplete="username" autofocus placeholder="请输入管理员账号"></span></label>
         <label>密码<span><LockKeyhole /><input v-model="password" type="password" autocomplete="current-password" placeholder="请输入密码"></span></label>
         <p v-if="error" class="login-error">{{ error }}</p>
-        <button class="primary" type="submit">登录并进入工作台</button>
+        <button class="primary" type="submit" :disabled="loading">{{ loading ? '登录中…' : '登录并进入工作台' }}</button>
       </form>
       <small>游客无需登录，可直接查看机房并提交预约。</small>
     </section>

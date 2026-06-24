@@ -17,6 +17,16 @@ RSLabRoom/
 
 ## 本地运行
 
+后端（Node.js + Express，独立运行、不依赖 `hall/` 目录；接口与字段映射见 [backend/README.md](backend/README.md)）：
+
+```bash
+cd backend
+npm install
+npm run dev      # 默认 http://localhost:3001，凭据见 src/config.js（可用环境变量覆盖）
+```
+
+前端（开发期通过 Vite 代理把 `/api` 转发到后端）：
+
 ```bash
 cd frontend
 npm install
@@ -35,4 +45,4 @@ npm run build
 - 普通用户端：查询空闲机房、按时段预约、查看申请入口。
 - 管理工作台：待审批申请、机房动态、审批操作和管理导航。
 
-当前前端使用本地模拟数据，技术栈为 Vue 3、TypeScript、Vite 和 Lucide Icons。界面按视图、通用组件、数据与类型分层组织。
+前端技术栈为 Vue 3、TypeScript、Vite 和 Lucide Icons，界面按视图、通用组件、数据与类型分层组织。接口调用集中在 `frontend/src/api.ts`；后端可用时使用真实数据，不可用或历史库无对应字段（如机房设备、用户档案、排期规则）时自动回退到本地占位数据，且接口参数保持完整。

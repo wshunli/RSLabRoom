@@ -1,22 +1,58 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import {
   CalendarDays, Check, CircleHelp, Clock3, DoorOpen,
   LayoutDashboard, ListChecks, LogOut, MapPin, Phone, Save, Settings2,
   Trash2, UserRound, Users, X,
 } from '@lucide/vue'
+import { api } from '../api'
 import { days, initialRequests, periods, rooms } from '../data'
 import type { BookingRequest, RequestState } from '../types'
 
 defineProps<{ admin: { displayName: string } }>()
 const emit = defineEmits<{ logout: [] }>()
 
+// 以本地占位数据初始化，挂载后尝试用后端真实数据覆盖。
 const requests = ref<BookingRequest[]>(initialRequests.map((request) => ({ ...request })))
 const managedUsers = ref([
   { id: 1, name: '陈雨欣', phone: '138 0000 1208', unit: '遥感学院', role: '教师', enabled: true },
   { id: 2, name: '李明泽', phone: '139 0000 2107', unit: '测绘学院', role: '教师', enabled: true },
   { id: 3, name: '王老师', phone: '136 0000 2006', unit: '空间信息工程系', role: '管理员', enabled: true },
 ])
+
+onMounted(async () => {
+  try {
+    const list = await api.getApplications('all')
+    requests.value = list.map((item) => ({
+      id: item.id,
+      applicant: item.applicant,
+      phone: item.phone,
+      requiredSoftware: item.requiredSoftware,
+      people: item.people,
+      details: item.details,
+      courseName: item.courseName,
+      remarks: item.remarks,
+      state: item.state,
+    }))
+  } catch { /* 后端不可用：保留占位申请数据。 */ }
+
+  try {
+    const s = await api.getSettings()
+    systemSettings.value = {
+      startYear: s.startYear,
+      startMonth: s.startMonth,
+      startDay: s.startDay,
+      semesterWeeks: s.semesterWeeks,
+      contactName: s.contactName,
+      contactPhone: s.contactPhone,
+    }
+  } catch { /* 后端不可用：保留占位系统设置。 */ }
+
+  try {
+    const users = await api.getUsers()
+    if (users.length) managedUsers.value = users
+  } catch { /* 后端不可用：保留占位用户数据。 */ }
+})
 const systemSettings = ref({
   startYear: 2026,
   startMonth: 3,
@@ -60,12 +96,26 @@ const navigation = computed(() => [
   { name: '系统设置', icon: Settings2 },
 ])
 
-function updateRequest(id: string, state: RequestState) {
+async function updateRequest(id: string, state: RequestState) {
   const request = requests.value.find((item) => item.id === id)
-  if (request) request.state = state
+  if (!request) return
+  try {
+    if (state === 'approved') await api.approveApplication(id)
+    else if (state === 'rejected') await api.rejectApplication(id)
+  } catch (err) {
+    // 审批冲突等后端校验失败时提示并中止；网络不可用则按占位继续。
+    if (!(err instanceof TypeError)) {
+      alert(err instanceof Error ? err.message : '操作失败')
+      return
+    }
+  }
+  request.state = state
 }
 
-function deleteRequest(id: string) {
+async function deleteRequest(id: string) {
+  try {
+    await api.deleteApplication(id)
+  } catch { /* 网络不可用：按占位删除本地记录。 */ }
   requests.value = requests.value.filter((request) => request.id !== id)
 }
 
@@ -73,17 +123,23 @@ function deleteUser(id: number) {
   managedUsers.value = managedUsers.value.filter((user) => user.id !== id)
 }
 
-function saveSystemSettings() {
+async function saveSystemSettings() {
+  try {
+    await api.updateSettings(systemSettings.value)
+  } catch { /* 网络不可用：仅本地标记已保存。 */ }
   settingsSaved.value = true
 }
 
-function addScheduleRule() {
+async function addScheduleRule() {
   if (scheduleForm.startWeek > scheduleForm.endWeek) return
+  // 历史库无排期规则表，后端为占位接口；本地仍维护规则列表用于展示。
+  try { await api.addSchedule({ ...scheduleForm }) } catch { /* 占位接口，忽略失败 */ }
   scheduleRules.value.push({ id: nextScheduleId.value++, ...scheduleForm })
   scheduleForm.courseName = ''
 }
 
-function deleteScheduleRule(id: number) {
+async function deleteScheduleRule(id: number) {
+  try { await api.deleteSchedule(id) } catch { /* 占位接口，忽略失败 */ }
   scheduleRules.value = scheduleRules.value.filter((rule) => rule.id !== id)
 }
 

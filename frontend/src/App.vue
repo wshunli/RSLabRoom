@@ -39,6 +39,7 @@ function handleLogin(user: AdminUser) {
 function handleLogout() {
   admin.value = null
   sessionStorage.removeItem('room-admin')
+  sessionStorage.removeItem('room-admin-token')
   mode.value = 'user'
 }
 </script>
