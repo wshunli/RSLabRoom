@@ -6,8 +6,9 @@ import {
 } from '@lucide/vue'
 import BookingDrawer from '../components/BookingDrawer.vue'
 import RoomRow from '../components/RoomRow.vue'
+import SlotDetailDialog from '../components/SlotDetailDialog.vue'
 import { api } from '../api'
-import { periods, weekdays } from '../data'
+import { isDayPast, periods, weekdays } from '../data'
 import type { Room, SelectedSlot } from '../types'
 
 const query = ref('')
@@ -21,7 +22,7 @@ const loading = ref(true)
 const error = ref('')
 const roomList = ref<Room[]>([])
 const busySlots = ref<Set<string>>(new Set())
-const slotInfo = ref<Map<string, { courseName: string }>>(new Map())
+const slotInfo = ref<Map<string, { courseName: string; teacher: string; date: string }>>(new Map())
 const week = ref(1)
 const totalWeeks = ref(0)
 const rangeStart = ref('')
@@ -36,11 +37,11 @@ function addDays(date: string, n: number) {
 
 // 由当前周的起始日期生成 7 天（含真实日期），与时段表对齐。
 const days = computed(() => {
-  if (!rangeStart.value) return weekdays.map((name) => ({ week: name, date: '' }))
+  if (!rangeStart.value) return weekdays.map((name) => ({ week: name, date: '', past: false }))
   return weekdays.map((name, i) => {
     const date = addDays(rangeStart.value, i)
     const md = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
-    return { week: name, date: md }
+    return { week: name, date: md, past: isDayPast(rangeStart.value, i) }
   })
 })
 
@@ -63,10 +64,10 @@ async function loadAvailability(target: number) {
   rangeStart.value = data.range.start
   rangeEnd.value = data.range.end
   const busy = new Set<string>()
-  const info = new Map<string, { courseName: string }>()
+  const info = new Map<string, { courseName: string; teacher: string; date: string }>()
   for (const slot of data.slots) {
     busy.add(slot.key)
-    info.set(slot.key, { courseName: slot.courseName })
+    info.set(slot.key, { courseName: slot.courseName, teacher: slot.teacher, date: slot.date })
   }
   busySlots.value = busy
   slotInfo.value = info
@@ -98,10 +99,39 @@ onMounted(async () => {
 })
 
 function toggleSlot(room: SelectedSlot['room'], day: number, period: number) {
+  if (days.value[day]?.past) return
   const index = selected.value.findIndex((slot) => slot.room.id === room.id && slot.day === day && slot.period === period)
   if (index >= 0) selected.value.splice(index, 1)
   else selected.value.push({ room, day, period })
   submitted.value = false
+}
+
+interface SlotDetail {
+  roomName: string
+  building: string
+  courseName: string
+  teacher: string
+  date: string
+  dayLabel: string
+  week: number
+  period: number
+}
+
+const slotDetail = ref<SlotDetail | null>(null)
+
+function openDetail(room: Room, day: number, period: number) {
+  const info = slotInfo.value.get(`${room.id}-${day}-${period}`)
+  if (!info) return
+  slotDetail.value = {
+    roomName: room.name,
+    building: room.building,
+    courseName: info.courseName,
+    teacher: info.teacher,
+    date: info.date || days.value[day]?.date || '',
+    dayLabel: days.value[day]?.week || '',
+    week: week.value,
+    period,
+  }
 }
 
 interface BookingForm {
@@ -183,6 +213,7 @@ function finishBooking() {
             :slot-info="slotInfo"
             :days="days"
             @toggle="(day, period) => toggleSlot(room, day, period)"
+            @detail="(day, period) => openDetail(room, day, period)"
           />
         </div>
         <div v-if="!filteredRooms.length" class="empty"><Search /><h3>没有找到符合条件的机房</h3><p>试试调整关键词或容量筛选。</p></div>
@@ -210,6 +241,12 @@ function finishBooking() {
       @close="drawerOpen = false"
       @submit="handleSubmit"
       @finish="finishBooking"
+    />
+
+    <SlotDetailDialog
+      v-if="slotDetail"
+      v-bind="slotDetail"
+      @close="slotDetail = null"
     />
   </main>
 </template>

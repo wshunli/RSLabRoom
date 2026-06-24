@@ -5,8 +5,9 @@ import {
   ArrowLeft, CalendarCheck2, CalendarDays, Clock3, MapPin, Phone, Search, UserRound, Users,
 } from '@lucide/vue'
 import BookingDrawer from '../components/BookingDrawer.vue'
+import SlotDetailDialog from '../components/SlotDetailDialog.vue'
 import { api, type AvailabilityResponse } from '../api'
-import { periods, weekdays } from '../data'
+import { isDayPast, periods, weekdays } from '../data'
 import type { Room, SelectedSlot } from '../types'
 
 const PAGE_SIZE = 5
@@ -28,7 +29,7 @@ interface WeekSchedule {
   rangeEnd: string
   days: { week: string; date: string }[]
   busy: Set<string>
-  info: Map<string, { courseName: string }>
+  info: Map<string, { courseName: string; teacher: string; date: string }>
 }
 
 const loadedWeeks = ref<WeekSchedule[]>([])
@@ -63,11 +64,11 @@ function buildDays(rangeStart: string) {
 
 function mapWeek(data: AvailabilityResponse): WeekSchedule {
   const busy = new Set<string>()
-  const info = new Map<string, { courseName: string }>()
+  const info = new Map<string, { courseName: string; teacher: string; date: string }>()
   for (const slot of data.slots) {
     if (slot.roomId !== roomId.value) continue
     busy.add(slot.key)
-    info.set(slot.key, { courseName: slot.courseName })
+    info.set(slot.key, { courseName: slot.courseName, teacher: slot.teacher, date: slot.date })
   }
   return {
     week: data.week,
@@ -83,6 +84,10 @@ function isBusy(w: WeekSchedule, day: number, period: number) {
   return w.busy.has(`${roomId.value}-${day}-${period}`)
 }
 
+function isPast(w: WeekSchedule, day: number) {
+  return isDayPast(w.rangeStart, day)
+}
+
 function courseName(w: WeekSchedule, day: number, period: number) {
   return w.info.get(`${roomId.value}-${day}-${period}`)?.courseName || '已占用'
 }
@@ -91,8 +96,42 @@ function isSelected(w: WeekSchedule, day: number, period: number) {
   return selected.value.some((s) => s.week === w.week && s.day === day && s.period === period)
 }
 
-function toggleSlot(w: WeekSchedule, day: number, period: number) {
+interface SlotDetail {
+  roomName: string
+  building: string
+  courseName: string
+  teacher: string
+  date: string
+  dayLabel: string
+  week: number
+  period: number
+}
+
+const slotDetail = ref<SlotDetail | null>(null)
+
+function onSlotClick(w: WeekSchedule, day: number, period: number) {
+  if (isBusy(w, day, period)) openDetail(w, day, period)
+  else toggleSlot(w, day, period)
+}
+
+function openDetail(w: WeekSchedule, day: number, period: number) {
   if (!room.value) return
+  const info = w.info.get(`${roomId.value}-${day}-${period}`)
+  if (!info) return
+  slotDetail.value = {
+    roomName: room.value.name,
+    building: room.value.building,
+    courseName: info.courseName,
+    teacher: info.teacher,
+    date: info.date || w.days[day].date,
+    dayLabel: w.days[day].week,
+    week: w.week,
+    period,
+  }
+}
+
+function toggleSlot(w: WeekSchedule, day: number, period: number) {
+  if (!room.value || isPast(w, day)) return
   const index = selected.value.findIndex((s) => s.week === w.week && s.day === day && s.period === period)
   if (index >= 0) {
     selected.value.splice(index, 1)
@@ -247,12 +286,13 @@ watch(roomId, init)
                 <button
                   v-for="(_, dayIndex) in w.days"
                   :key="dayIndex"
-                  :disabled="isBusy(w, dayIndex, periodIndex)"
-                  :class="[isBusy(w, dayIndex, periodIndex) ? 'busy' : 'free', { selected: isSelected(w, dayIndex, periodIndex) }]"
+                  :disabled="isPast(w, dayIndex)"
+                  :class="[isBusy(w, dayIndex, periodIndex) ? 'busy' : 'free', { selected: isSelected(w, dayIndex, periodIndex), past: isPast(w, dayIndex) }]"
                   :aria-pressed="isSelected(w, dayIndex, periodIndex)"
-                  @click="toggleSlot(w, dayIndex, periodIndex)"
+                  @click="onSlotClick(w, dayIndex, periodIndex)"
                 >
                   <template v-if="isBusy(w, dayIndex, periodIndex)"><span>课程</span><small>{{ courseName(w, dayIndex, periodIndex) }}</small></template>
+                  <template v-else-if="isPast(w, dayIndex)"><span>空闲</span></template>
                   <template v-else-if="isSelected(w, dayIndex, periodIndex)"><span>已选择</span><small>再次点击取消</small></template>
                   <template v-else><span>空闲</span><small>可预约</small></template>
                 </button>
@@ -288,6 +328,12 @@ watch(roomId, init)
         @close="drawerOpen = false"
         @submit="handleSubmit"
         @finish="finishBooking"
+      />
+
+      <SlotDetailDialog
+        v-if="slotDetail"
+        v-bind="slotDetail"
+        @close="slotDetail = null"
       />
     </section>
   </main>

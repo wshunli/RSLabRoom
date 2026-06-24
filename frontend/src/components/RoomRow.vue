@@ -8,17 +8,29 @@ const props = defineProps<{
   room: Room
   selected: SelectedSlot[]
   busySlots: Set<string>
-  slotInfo: Map<string, { courseName: string }>
-  days: { week: string; date: string }[]
+  slotInfo: Map<string, { courseName: string; teacher?: string; date?: string }>
+  days: { week: string; date: string; past?: boolean }[]
 }>()
-const emit = defineEmits<{ toggle: [day: number, period: number] }>()
+const emit = defineEmits<{
+  toggle: [day: number, period: number]
+  detail: [day: number, period: number]
+}>()
 
 function isBusy(day: number, period: number) {
   return props.busySlots.has(`${props.room.id}-${day}-${period}`)
 }
 
+function isPast(day: number) {
+  return !!props.days[day]?.past
+}
+
 function courseName(day: number, period: number) {
   return props.slotInfo.get(`${props.room.id}-${day}-${period}`)?.courseName || '已占用'
+}
+
+function onClick(day: number, period: number) {
+  if (isBusy(day, period)) emit('detail', day, period)
+  else emit('toggle', day, period)
 }
 
 function isSelected(day: number, period: number) {
@@ -46,12 +58,13 @@ function isSelected(day: number, period: number) {
         <button
           v-for="(_, dayIndex) in days"
           :key="dayIndex"
-          :disabled="isBusy(dayIndex, periodIndex)"
-          :class="[isBusy(dayIndex, periodIndex) ? 'busy' : 'free', { selected: isSelected(dayIndex, periodIndex) }]"
+          :disabled="isPast(dayIndex)"
+          :class="[isBusy(dayIndex, periodIndex) ? 'busy' : 'free', { selected: isSelected(dayIndex, periodIndex), past: isPast(dayIndex) }]"
           :aria-pressed="isSelected(dayIndex, periodIndex)"
-          @click="emit('toggle', dayIndex, periodIndex)"
+          @click="onClick(dayIndex, periodIndex)"
         >
           <template v-if="isBusy(dayIndex, periodIndex)"><span>课程</span><small>{{ courseName(dayIndex, periodIndex) }}</small></template>
+          <template v-else-if="isPast(dayIndex)"><span>空闲</span></template>
           <template v-else-if="isSelected(dayIndex, periodIndex)"><span>已选择</span><small>再次点击取消</small></template>
           <template v-else><span>空闲</span><small>可预约</small></template>
         </button>
