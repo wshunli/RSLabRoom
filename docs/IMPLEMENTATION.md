@@ -45,12 +45,11 @@ POST   /api/admin/schedules/import         导入教务课表
 
 ## 权限与状态机
 
-用户分为普通用户、审批管理员、系统管理员。申请状态建议固定为：
+用户分为普通用户、审批管理员、系统管理员。申请审批状态固定为三种：
 
 ```text
-DRAFT → PENDING → APPROVED → COMPLETED
-                 ↘ REJECTED
-PENDING / APPROVED → CANCELLED（按规则限制）
+PENDING（待审批） → APPROVED（已通过）
+                 ↘ REJECTED（已驳回）
 ```
 
 所有管理员动作记录操作者、时间、原值、新值和 IP。前端只负责隐藏无权限入口，

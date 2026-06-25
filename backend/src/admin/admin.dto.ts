@@ -2,8 +2,8 @@ import { Type } from 'class-transformer'
 import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator'
 
 export class ApplicationQueryDto {
-  @IsOptional() @IsIn(['pending', 'approved', 'all'])
-  status: 'pending' | 'approved' | 'all' = 'all'
+  @IsOptional() @IsIn(['pending', 'approved', 'rejected', 'all'])
+  status: 'pending' | 'approved' | 'rejected' | 'all' = 'all'
 
   @IsOptional() @IsString() @MaxLength(10)
   date?: string

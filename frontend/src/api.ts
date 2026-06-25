@@ -125,7 +125,7 @@ export const api = {
 
   // ---- 申请审批（分页 + 多条件筛选） ----------------------------------------
   getApplications: (
-    status: 'pending' | 'approved' | 'all' = 'all',
+    status: 'pending' | 'approved' | 'rejected' | 'all' = 'all',
     page = 1,
     pageSize = 15,
     filters: { date?: string; courseName?: string; teacher?: string } = {},

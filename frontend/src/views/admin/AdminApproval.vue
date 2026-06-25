@@ -27,7 +27,7 @@ type ApprovalRequest = BookingRequest & { detailList: string[] }
 const requests = ref<ApprovalRequest[]>([])
 const selectedRequest = ref<ApprovalRequest | null>(null)
 
-type StatusFilter = 'all' | 'pending' | 'approved'
+type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected'
 const appStatus = ref<StatusFilter>('all')
 const appPage = ref(1)
 const appPageSize = ref(15)
@@ -45,7 +45,13 @@ const statusOptions: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: '全部' },
   { value: 'pending', label: '待审批' },
   { value: 'approved', label: '已通过' },
+  { value: 'rejected', label: '已驳回' },
 ]
+const statusLabels: Record<RequestState, string> = {
+  pending: '待审批',
+  approved: '已通过',
+  rejected: '已驳回',
+}
 
 const totalPages = computed(() => Math.max(1, Math.ceil(appTotal.value / appPageSize.value)))
 const pageNumbers = computed(() => {
@@ -228,12 +234,12 @@ onMounted(() => {
               <td class="request-detail" data-label="详细信息"><button class="cell-link" @click="showDetail(request)">{{ request.details || '—' }}</button></td>
               <td data-label="课程名称"><button class="cell-link strong" @click="showDetail(request)">{{ request.courseName || '—' }}</button></td>
               <td class="request-note" data-label="备注"><button class="cell-link" @click="showDetail(request)">{{ request.remarks || '—' }}</button></td>
-              <td data-label="状态"><span class="status" :class="request.state">{{ request.state === 'approved' ? '已通过' : '待审批' }}</span></td>
+              <td data-label="状态"><span class="status" :class="request.state">{{ statusLabels[request.state] }}</span></td>
               <td data-label="操作">
                 <div class="approval-actions">
                   <button class="view-detail" title="查看详情" @click="showDetail(request)"><Eye />详情</button>
                   <button v-if="request.state === 'pending'" class="approve" title="通过" @click="updateRequest(request.id, 'approved')"><Check />通过</button>
-                  <button v-else class="reject" title="撤销" @click="updateRequest(request.id, 'rejected')"><X />撤销</button>
+                  <button v-if="request.state !== 'rejected'" class="reject" title="驳回" @click="updateRequest(request.id, 'rejected')"><X />驳回</button>
                   <button class="delete" title="删除" @click="deleteRequest(request.id)"><Trash2 />删除</button>
                 </div>
               </td>
@@ -292,10 +298,10 @@ onMounted(() => {
           </div>
         </div>
         <div class="approval-detail-footer">
-          <span class="status" :class="selectedRequest.state">{{ selectedRequest.state === 'approved' ? '已通过' : '待审批' }}</span>
+          <span class="status" :class="selectedRequest.state">{{ statusLabels[selectedRequest.state] }}</span>
           <div class="approval-actions">
             <button v-if="selectedRequest.state === 'pending'" class="approve" title="通过" @click="updateRequest(selectedRequest.id, 'approved'); closeDetail()"><Check />通过</button>
-            <button v-else class="reject" title="撤销" @click="updateRequest(selectedRequest.id, 'rejected'); closeDetail()"><X />撤销</button>
+            <button v-if="selectedRequest.state !== 'rejected'" class="reject" title="驳回" @click="updateRequest(selectedRequest.id, 'rejected'); closeDetail()"><X />驳回</button>
             <button class="delete" title="删除" @click="deleteRequest(selectedRequest.id); closeDetail()"><Trash2 />删除</button>
           </div>
         </div>

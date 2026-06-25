@@ -6,7 +6,7 @@ import { rowToRoom } from '../shared/rooms'
 import { formatDate, parseDate, PERIOD_HOURS, PERIOD_NAMES, periodToTag, slotDate } from '../shared/time'
 import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
 
-const STATE_BY_CODE: Record<number, string> = { 0: 'pending', 1: 'approved' }
+const STATE_BY_CODE: Record<number, string> = { 0: 'pending', 1: 'approved', 2: 'rejected' }
 const SCHEDULING_LOCK = 'rslabroom:scheduling'
 
 @Injectable()
@@ -40,6 +40,7 @@ export class AdminService {
 
     if (query.status === 'pending') conditions.push('s.sstatus = 0')
     else if (query.status === 'approved') conditions.push('s.sstatus = 1')
+    else if (query.status === 'rejected') conditions.push('s.sstatus = 2')
     if (courseName) {
       conditions.push('s.sname LIKE ?')
       params.push(`%${courseName}%`)
@@ -206,9 +207,9 @@ export class AdminService {
   async reject(id: string) {
     await this.database.transaction(async (connection) => {
       await connection.execute('UPDATE borrow SET status = 0 WHERE btimeid = ?', [id])
-      await connection.execute('UPDATE submit SET sstatus = 0 WHERE stimeid = ?', [id])
+      await connection.execute('UPDATE submit SET sstatus = 2 WHERE stimeid = ?', [id])
     })
-    return { id, state: 'pending' }
+    return { id, state: 'rejected' }
   }
 
   async deleteApplication(id: string) {
