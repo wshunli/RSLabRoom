@@ -3,6 +3,9 @@ const WEEK_MS = 7 * DAY_MS
 
 export const PERIOD_NAMES = ['上午', '下午', '晚上']
 
+// 各时段的近似课时数（用于工作量统计），索引与 period 一致：上午/下午/晚上。
+export const PERIOD_HOURS = [4, 4, 3]
+
 export function parseDate(value: string): Date {
   const [year, month, day] = String(value).split('-').map(Number)
   return new Date(year, (month || 1) - 1, day || 1)

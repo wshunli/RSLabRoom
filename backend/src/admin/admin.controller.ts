@@ -8,6 +8,9 @@ import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateS
 export class AdminController {
   constructor(private readonly service: AdminService) {}
 
+  @Get('stats')
+  getStats() { return this.service.getStats() }
+
   @Get('applications')
   getApplications(@Query() query: ApplicationQueryDto) { return this.service.getApplications(query) }
 

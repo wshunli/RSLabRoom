@@ -58,13 +58,14 @@ function isSelected(day: number, period: number) {
         <button
           v-for="(_, dayIndex) in days"
           :key="dayIndex"
-          :disabled="isPast(dayIndex)"
+          :disabled="isPast(dayIndex) && !isBusy(dayIndex, periodIndex)"
+          :title="isPast(dayIndex) && !isBusy(dayIndex, periodIndex) ? '该时段已过期，无法预约' : undefined"
           :class="[isBusy(dayIndex, periodIndex) ? 'busy' : 'free', { selected: isSelected(dayIndex, periodIndex), past: isPast(dayIndex) }]"
           :aria-pressed="isSelected(dayIndex, periodIndex)"
           @click="onClick(dayIndex, periodIndex)"
         >
           <template v-if="isBusy(dayIndex, periodIndex)"><span>课程</span><small>{{ courseName(dayIndex, periodIndex) }}</small></template>
-          <template v-else-if="isPast(dayIndex)"><span>空闲</span></template>
+          <template v-else-if="isPast(dayIndex)"></template>
           <template v-else-if="isSelected(dayIndex, periodIndex)"><span>已选择</span><small>再次点击取消</small></template>
           <template v-else><span>空闲</span><small>可预约</small></template>
         </button>

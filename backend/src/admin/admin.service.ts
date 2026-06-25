@@ -3,7 +3,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { DatabaseService } from '../database/database.service'
 import { rowToRoom } from '../shared/rooms'
-import { formatDate, parseDate, PERIOD_NAMES, periodToTag, slotDate } from '../shared/time'
+import { formatDate, parseDate, PERIOD_HOURS, PERIOD_NAMES, periodToTag, slotDate } from '../shared/time'
 import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
 
 const STATE_BY_CODE: Record<number, string> = { 0: 'pending', 1: 'approved' }
@@ -59,6 +59,95 @@ export class AdminService {
     }))
     const pending = await this.database.queryOne<RowDataPacket>('SELECT COUNT(*) AS total FROM submit WHERE sstatus = 0')
     return { items, total, page: query.page, pageSize: query.pageSize, pendingTotal: Number(pending?.total || 0) }
+  }
+
+  // 概览统计：本周 / 本月 / 今日 的排课次数与课时，以及亮点数据和今日占用明细。
+  async getStats() {
+    const now = new Date()
+    const today = formatDate(now)
+    // 本周一 ~ 本周日（周一为一周起点）。
+    const mondayOffset = (now.getDay() + 6) % 7
+    const weekStart = new Date(now); weekStart.setDate(now.getDate() - mondayOffset)
+    const weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6)
+    // 本月一日 ~ 本月最后一日。
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+    const hoursSql = `CASE tag ${PERIOD_HOURS.map((h, i) => `WHEN ${i + 1} THEN ${h}`).join(' ')} ELSE 0 END`
+    const rangeStat = async (start: string, end: string) => {
+      const row = await this.database.queryOne<RowDataPacket>(
+        `SELECT COUNT(*) AS cnt, COALESCE(SUM(${hoursSql}), 0) AS hours,
+                COUNT(DISTINCT bclassid) AS rooms, COUNT(DISTINCT btime) AS days
+           FROM borrow WHERE status = 1 AND btime BETWEEN ? AND ?`,
+        [start, end],
+      )
+      return {
+        count: Number(row?.cnt || 0),
+        hours: Number(row?.hours || 0),
+        rooms: Number(row?.rooms || 0),
+        days: Number(row?.days || 0),
+      }
+    }
+
+    const monthRange: [string, string] = [formatDate(monthStart), formatDate(monthEnd)]
+    const [todayStat, weekStat, monthStat] = await Promise.all([
+      rangeStat(today, today),
+      rangeStat(formatDate(weekStart), formatDate(weekEnd)),
+      rangeStat(...monthRange),
+    ])
+
+    // 本月最常用机房。
+    const top = await this.database.queryOne<RowDataPacket>(
+      `SELECT b.bclassid AS cid, c.cname, COUNT(*) AS cnt
+         FROM borrow b LEFT JOIN class c ON b.bclassid = c.cid
+        WHERE b.status = 1 AND b.btime BETWEEN ? AND ?
+        GROUP BY b.bclassid, c.cname ORDER BY cnt DESC LIMIT 1`,
+      monthRange,
+    )
+    const topRoom = top
+      ? { name: rowToRoom({ cid: Number(top.cid), cname: String(top.cname || ''), cintro: '' }).name || `机房${top.cid}`, count: Number(top.cnt) }
+      : null
+
+    // 本月最忙时段。
+    const busiest = await this.database.queryOne<RowDataPacket>(
+      `SELECT tag, COUNT(*) AS cnt FROM borrow
+        WHERE status = 1 AND btime BETWEEN ? AND ?
+        GROUP BY tag ORDER BY cnt DESC LIMIT 1`,
+      monthRange,
+    )
+    const busiestPeriod = busiest ? (PERIOD_NAMES[Number(busiest.tag) - 1] || '') : ''
+
+    // 今日各机房各时段占用明细。
+    const todayRows = await this.database.query<RowDataPacket[]>(
+      `SELECT bclassid, tag, bname, bperson, bnumer, bsoftware
+         FROM borrow WHERE status = 1 AND btime = ?`,
+      [today],
+    )
+    const todayList = todayRows.map((row) => ({
+      roomId: Number(row.bclassid),
+      period: Number(row.tag) - 1,
+      courseName: String(row.bname || ''),
+      teacher: String(row.bperson || ''),
+      people: Number(row.bnumer) || 0,
+      software: String(row.bsoftware || ''),
+    }))
+
+    const submitCount = await this.database.queryOne<RowDataPacket>('SELECT COUNT(*) AS total FROM submit')
+    const pendingCount = await this.database.queryOne<RowDataPacket>('SELECT COUNT(*) AS total FROM submit WHERE sstatus = 0')
+    const userCount = await this.database.queryOne<RowDataPacket>('SELECT COUNT(*) AS total FROM user')
+
+    return {
+      today: todayStat,
+      week: weekStat,
+      month: monthStat,
+      topRoom,
+      busiestPeriod,
+      monthLabel: `${now.getFullYear()}年${now.getMonth() + 1}月`,
+      weekRange: { start: formatDate(weekStart), end: formatDate(weekEnd) },
+      todayList,
+      applications: { total: Number(submitCount?.total || 0), pending: Number(pendingCount?.total || 0) },
+      users: Number(userCount?.total || 0),
+    }
   }
 
   async approve(id: string) {

@@ -66,6 +66,28 @@ export interface AvailabilityResponse {
   slots: AvailabilitySlot[]
 }
 
+export interface RangeStat { count: number; hours: number; rooms: number; days: number }
+export interface TodayOccupancy {
+  roomId: number
+  period: number
+  courseName: string
+  teacher: string
+  people: number
+  software: string
+}
+export interface AdminStats {
+  today: RangeStat
+  week: RangeStat
+  month: RangeStat
+  topRoom: { name: string; count: number } | null
+  busiestPeriod: string
+  monthLabel: string
+  weekRange: { start: string; end: string }
+  todayList: TodayOccupancy[]
+  applications: { total: number; pending: number }
+  users: number
+}
+
 export const api = {
   getConfig: () => request<SiteConfig>('/config'),
 
@@ -88,6 +110,9 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(payload),
   }),
+
+  // ---- 概览统计 -------------------------------------------------------------
+  getStats: () => request<AdminStats>('/admin/stats'),
 
   // ---- 管理员认证 -----------------------------------------------------------
   adminLogin: (username: string, password: string) =>
