@@ -26,7 +26,7 @@ const loading = ref(true)
 const error = ref('')
 const roomList = ref<Room[]>([])
 const busySlots = ref<Set<string>>(new Set())
-const slotInfo = ref<Map<string, { courseName: string; teacher: string; date: string }>>(new Map())
+const slotInfo = ref<Map<string, { courseName: string; teacher: string; phone: string; date: string }>>(new Map())
 const week = ref(1)
 const totalWeeks = ref(0)
 const currentTeachingWeek = ref(0)
@@ -69,10 +69,10 @@ async function loadAvailability(target: number) {
   rangeStart.value = data.range.start
   rangeEnd.value = data.range.end
   const busy = new Set<string>()
-  const info = new Map<string, { courseName: string; teacher: string; date: string }>()
+  const info = new Map<string, { courseName: string; teacher: string; phone: string; date: string }>()
   for (const slot of data.slots) {
     busy.add(slot.key)
-    info.set(slot.key, { courseName: slot.courseName, teacher: slot.teacher, date: slot.date })
+    info.set(slot.key, { courseName: slot.courseName, teacher: slot.teacher, phone: slot.phone, date: slot.date })
   }
   busySlots.value = busy
   slotInfo.value = info
@@ -126,6 +126,7 @@ interface SlotDetail {
   building: string
   courseName: string
   teacher: string
+  phone: string
   date: string
   dayLabel: string
   week: number
@@ -142,6 +143,7 @@ function openDetail(room: Room, day: number, period: number) {
     building: room.building,
     courseName: info.courseName,
     teacher: info.teacher,
+    phone: info.phone,
     date: info.date || days.value[day]?.date || '',
     dayLabel: days.value[day]?.week || '',
     week: week.value,

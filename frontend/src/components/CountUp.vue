@@ -25,9 +25,17 @@ const fractionDigits = computed(() => {
 
 const text = computed(() => display.value.toFixed(fractionDigits.value))
 
+// 是否跳过动画直接落定：用户偏好减弱动效，或页面不可见（后台标签页
+// 中 rAF 会被暂停，动画无从进行）时，直接显示目标值，避免数字卡在 0。
+function shouldSkip() {
+  if (typeof window === 'undefined') return true
+  if (document.hidden) return true
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+}
+
 function play(from = 0, to = props.value) {
   cancelAnimationFrame(raf)
-  if (to === from) { display.value = to; return }
+  if (to === from || shouldSkip()) { display.value = to; return }
   const start = performance.now()
   const step = (now: number) => {
     const t = Math.min((now - start) / props.duration, 1)
