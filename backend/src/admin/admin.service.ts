@@ -13,9 +13,9 @@ function userResponse(row: RowDataPacket) {
   return {
     id: String(row.username),
     username: String(row.username),
-    name: String(row.name || ''),
-    email: String(row.email || ''),
-    phone: String(row.phone || ''),
+    name: '',
+    email: '',
+    phone: '',
     role: '管理员',
   }
 }
@@ -266,19 +266,16 @@ export class AdminService {
   }
 
   async getUsers() {
-    const rows = await this.database.query<RowDataPacket[]>('SELECT username, name, email, phone FROM user ORDER BY username')
+    const rows = await this.database.query<RowDataPacket[]>('SELECT username FROM user ORDER BY username')
     return rows.map(userResponse)
   }
 
   async createUser(body: CreateUserDto) {
     const existing = await this.database.queryOne<RowDataPacket>('SELECT username FROM user WHERE username = ?', [body.username])
     if (existing) throw new ConflictException({ error: '账号已存在' })
-    await this.database.query('INSERT INTO user (username, upwd, name, email, phone) VALUES (?, ?, ?, ?, ?)', [
+    await this.database.query('INSERT INTO user (username, upwd) VALUES (?, ?)', [
       body.username,
       createHash('md5').update(body.password).digest('hex'),
-      body.name,
-      body.email,
-      body.phone,
     ])
     return userResponse(body as unknown as RowDataPacket)
   }
@@ -291,22 +288,13 @@ export class AdminService {
       if (duplicate) throw new ConflictException({ error: '新账号名已存在' })
     }
     if (body.password) {
-      await this.database.query('UPDATE user SET username = ?, upwd = ?, name = ?, email = ?, phone = ? WHERE username = ?', [
+      await this.database.query('UPDATE user SET username = ?, upwd = ? WHERE username = ?', [
         body.username,
         createHash('md5').update(body.password).digest('hex'),
-        body.name,
-        body.email,
-        body.phone,
         currentUsername,
       ])
     } else {
-      await this.database.query('UPDATE user SET username = ?, name = ?, email = ?, phone = ? WHERE username = ?', [
-        body.username,
-        body.name,
-        body.email,
-        body.phone,
-        currentUsername,
-      ])
+      await this.database.query('UPDATE user SET username = ? WHERE username = ?', [body.username, currentUsername])
     }
     return userResponse(body as unknown as RowDataPacket)
   }
@@ -327,8 +315,11 @@ export class AdminService {
   private roomColumns(body: RoomDto) {
     const location = [body.building.trim(), body.name.trim()].filter(Boolean).join('-')
     const suffix = `（${body.seats}座，${body.audience || '实验教学中心'}）`
-    const cname = `${location}${suffix}`
-    const cintro = [body.intro, `机位：${body.seats}`, `管理员：${body.administrator}`, `联系电话：${body.phone}`].filter(Boolean).join('\n')
+    const cname = `${location}${suffix}`.slice(0, 200)
+    const cintro = [body.intro, `机位：${body.seats}`, `管理员：${body.administrator}`, `联系电话：${body.phone}`]
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, 200)
     return { cname, cintro }
   }
 

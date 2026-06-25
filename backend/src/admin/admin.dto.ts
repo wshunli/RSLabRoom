@@ -103,13 +103,13 @@ export class CreateUserDto {
   @IsString() @IsNotEmpty() @MaxLength(200)
   password: string
 
-  @IsString() @MaxLength(50)
+  @IsOptional() @IsString() @MaxLength(50)
   name = ''
 
-  @IsString() @MaxLength(100)
+  @IsOptional() @IsString() @MaxLength(100)
   email = ''
 
-  @IsString() @MaxLength(25)
+  @IsOptional() @IsString() @MaxLength(25)
   phone = ''
 }
 
@@ -120,13 +120,13 @@ export class UpdateUserDto {
   @IsOptional() @IsString() @IsNotEmpty() @MaxLength(200)
   password?: string
 
-  @IsString() @MaxLength(50)
+  @IsOptional() @IsString() @MaxLength(50)
   name = ''
 
-  @IsString() @MaxLength(100)
+  @IsOptional() @IsString() @MaxLength(100)
   email = ''
 
-  @IsString() @MaxLength(25)
+  @IsOptional() @IsString() @MaxLength(25)
   phone = ''
 }
 
