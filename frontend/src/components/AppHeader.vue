@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Bell, Building2, LogIn, LogOut, Menu, X } from '@lucide/vue'
 import type { AdminUser } from '../types'
+import { adminStore } from '../stores/admin'
 
-defineProps<{ admin: AdminUser | null }>()
+const props = defineProps<{ admin: AdminUser | null }>()
 const emit = defineEmits<{ login: []; logout: [] }>()
 
 const mobileNav = defineModel<boolean>('mobileNav', { required: true })
@@ -28,6 +29,15 @@ function handleAdminClick() {
   mobileNav.value = false
   emit('login')
 }
+
+watch(
+  () => props.admin,
+  (admin) => {
+    if (admin) adminStore.loadPending()
+    else adminStore.pendingTotal = 0
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -41,7 +51,7 @@ function handleAdminClick() {
     </nav>
     <div class="top-actions">
       <template v-if="admin">
-        <button class="icon-btn" aria-label="通知"><Bell :size="19" /><i /></button>
+        <button class="icon-btn" aria-label="通知"><Bell :size="19" /><i v-if="adminStore.pendingTotal > 0" /></button>
         <span class="avatar">{{ admin.displayName[0] }}</span><span class="user-name">{{ admin.displayName }}</span>
         <button class="session-btn" @click="emit('logout')"><LogOut :size="16" />退出</button>
       </template>

@@ -13,4 +13,13 @@ export const adminStore = reactive({
       this.rooms = []
     }
   },
+
+  async loadPending() {
+    try {
+      const res = await api.getApplications('pending', 1, 1)
+      this.pendingTotal = res.pendingTotal ?? 0
+    } catch {
+      this.pendingTotal = 0
+    }
+  },
 })
