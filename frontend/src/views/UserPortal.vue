@@ -253,7 +253,7 @@ function finishBooking() {
       <div class="filters">
         <label><Search :size="18" /><input v-model="query" placeholder="搜索机房或楼宇"></label>
         <select v-model="capacity">
-          <option>全部容量</option><option value="50">50 人以上</option><option value="70">70 人以上</option>
+          <option>全部容量</option><option value="30">30 人以上</option><option value="45">45 人以上</option>
         </select>
         <div class="legend"><span><i class="free" />空闲</span><span><i class="busy" />已占用</span></div>
       </div>
@@ -274,6 +274,7 @@ function finishBooking() {
           />
         </div>
         <div v-if="!filteredRooms.length" class="empty"><Search /><h3>没有找到符合条件的机房</h3><p>试试调整关键词或容量筛选。</p></div>
+        <p class="room-time-note">备注：上午时间：8:00-12:00 下午时间：14:00-18:00 晚上时间：18:00-22:00</p>
       </template>
     </section>
 
