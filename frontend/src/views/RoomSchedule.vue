@@ -286,13 +286,14 @@ watch(roomId, init)
                 <button
                   v-for="(_, dayIndex) in w.days"
                   :key="dayIndex"
-                  :disabled="isPast(w, dayIndex)"
+                  :disabled="isPast(w, dayIndex) && !isBusy(w, dayIndex, periodIndex)"
+                  :title="isPast(w, dayIndex) && !isBusy(w, dayIndex, periodIndex) ? '该时段已过期，无法预约' : undefined"
                   :class="[isBusy(w, dayIndex, periodIndex) ? 'busy' : 'free', { selected: isSelected(w, dayIndex, periodIndex), past: isPast(w, dayIndex) }]"
                   :aria-pressed="isSelected(w, dayIndex, periodIndex)"
                   @click="onSlotClick(w, dayIndex, periodIndex)"
                 >
                   <template v-if="isBusy(w, dayIndex, periodIndex)"><span>{{ courseName(w, dayIndex, periodIndex) }}</span></template>
-                  <template v-else-if="isPast(w, dayIndex)"><span>空闲</span></template>
+                  <template v-else-if="isPast(w, dayIndex)"></template>
                   <template v-else-if="isSelected(w, dayIndex, periodIndex)"><span>已选择</span><small>再次点击取消</small></template>
                   <template v-else><span>空闲</span><small>可预约</small></template>
                 </button>

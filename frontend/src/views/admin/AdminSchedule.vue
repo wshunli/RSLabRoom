@@ -217,7 +217,7 @@ onMounted(async () => {
             <label>重复方式<select v-model="weeklyForm.recurrence"><option value="weekly">每周</option><option value="odd">单周</option><option value="even">双周</option></select></label>
           </div>
         </div>
-        <SchedulePreview :room-id="weeklyForm.roomId" :room="weeklyRoom" :slots="weeklyPreviewSlots">
+        <SchedulePreview :room-id="weeklyForm.roomId" :room="weeklyRoom" :slots="weeklyPreviewSlots" :course-name="commonInfo.courseName">
           <template #actions>
             <button class="primary tool-submit" type="submit" :disabled="!adminStore.rooms.length">添加排期</button>
             <p v-if="weeklyError" class="schedule-form-error">{{ weeklyError }}</p>
@@ -240,7 +240,7 @@ onMounted(async () => {
             <label>周几<select v-model.number="dailyForm.endWeekday"><option v-for="{ day, index } in dailyEndWeekdayOptions" :key="day" :value="index">{{ day }}</option></select></label>
           </div>
         </div>
-        <SchedulePreview :room-id="dailyForm.roomId" :room="dailyRoom" :slots="dailyPreviewSlots">
+        <SchedulePreview :room-id="dailyForm.roomId" :room="dailyRoom" :slots="dailyPreviewSlots" :course-name="commonInfo.courseName">
           <template #actions>
             <button class="primary tool-submit" type="submit" :disabled="!adminStore.rooms.length">添加排期</button>
             <p v-if="dailyError" class="schedule-form-error">{{ dailyError }}</p>

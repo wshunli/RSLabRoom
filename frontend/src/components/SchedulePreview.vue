@@ -13,6 +13,8 @@ const props = defineProps<{
   room: Room | null
   // 本次排期将占用的时段（绝对教学周 + 周内偏移 day + 时段 period）
   slots: Array<{ week: number; day: number; period: number }>
+  /** 排期表单中的课程名称，未填写时显示为空 */
+  courseName?: string
 }>()
 
 // 按周聚合待添加时段，键为 `${day}-${period}`。
@@ -90,7 +92,7 @@ function cellState(week: number, day: number, period: number): CellState {
   if (b) return 'busy'
   return 'free'
 }
-function courseName(week: number, day: number, period: number) {
+function busyCourseName(week: number, day: number, period: number) {
   return busyFor(week).get(`${day}-${period}`)?.courseName || '已占用'
 }
 
@@ -183,10 +185,10 @@ function onCellClick(item: WeekItem, day: number, period: number) {
                 :class="[cellState(w.week, di, pi), { clickable: cellState(w.week, di, pi) === 'busy' || cellState(w.week, di, pi) === 'conflict' }]"
                 @click="onCellClick(w, di, pi)"
               >
-                <template v-if="cellState(w.week, di, pi) === 'conflict'"><span>冲突</span><small>已占用</small></template>
-                <template v-else-if="cellState(w.week, di, pi) === 'add'"><span>待添加</span><small>本次排期</small></template>
-                <template v-else-if="cellState(w.week, di, pi) === 'busy'"><span>{{ courseName(w.week, di, pi) }}</span></template>
-                <template v-else><span>空闲</span><small>可预约</small></template>
+                <template v-if="cellState(w.week, di, pi) === 'conflict'"><span>冲突</span><small>{{ busyCourseName(w.week, di, pi) }}</small></template>
+                <template v-else-if="cellState(w.week, di, pi) === 'add'"><span>待添加</span><small>{{ courseName || '' }}</small></template>
+                <template v-else-if="cellState(w.week, di, pi) === 'busy'"><span>{{ busyCourseName(w.week, di, pi) }}</span></template>
+                <template v-else><span>空闲</span></template>
               </div>
             </div>
           </div>
@@ -270,11 +272,17 @@ function onCellClick(item: WeekItem, day: number, period: number) {
 }
 .schedule-line .cell span { font-size: 12px; font-weight: 600; max-width: 94%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .schedule-line .cell small {
-  font-size: 8px;
+  font-size: 10px;
   opacity: .75;
   overflow: hidden;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.15;
   max-width: 92%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 /* 与预约大厅一致：空闲薄荷绿、已占用琥珀黄 */
 .schedule-line .cell.free { background: #e3f2ec; color: #21634e; border-color: #c4e1d5; }
