@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { CalendarDays } from '@lucide/vue'
 import { api } from '../../api'
 import { periods, weekdays } from '../../data'
 import { adminStore } from '../../stores/admin'
+import SchedulePreview from '../../components/SchedulePreview.vue'
 
 const semesterWeeks = ref(18)
+
+// 排期方式标签页：按周重复 / 按天重复
+const tab = ref<'weekly' | 'daily'>('weekly')
 
 type Recurrence = 'weekly' | 'odd' | 'even'
 
@@ -49,6 +53,32 @@ watch(() => adminStore.rooms, (rooms) => {
   if (!rooms.some((room) => room.id === weeklyForm.roomId)) weeklyForm.roomId = rooms[0].id
   if (!rooms.some((room) => room.id === dailyForm.roomId)) dailyForm.roomId = rooms[0].id
 }, { immediate: true, deep: true })
+
+// ---- 排期预览：把表单参数推导成将占用的时段，与后端生成逻辑保持一致 ----
+const weeklyRoom = computed(() => adminStore.rooms.find((r) => r.id === weeklyForm.roomId) ?? null)
+const dailyRoom = computed(() => adminStore.rooms.find((r) => r.id === dailyForm.roomId) ?? null)
+
+const weeklyPreviewSlots = computed(() => {
+  const slots: Array<{ week: number; day: number; period: number }> = []
+  if (weeklyForm.startWeek > weeklyForm.endWeek) return slots
+  for (let week = weeklyForm.startWeek; week <= weeklyForm.endWeek; week++) {
+    if (weeklyForm.recurrence === 'odd' && week % 2 === 0) continue
+    if (weeklyForm.recurrence === 'even' && week % 2 === 1) continue
+    slots.push({ week, day: weeklyForm.weekday, period: weeklyForm.period })
+  }
+  return slots
+})
+
+const dailyPreviewSlots = computed(() => {
+  const slots: Array<{ week: number; day: number; period: number }> = []
+  const startAbs = dailyForm.startWeek * 7 + dailyForm.startWeekday
+  const endAbs = dailyForm.endWeek * 7 + dailyForm.endWeekday
+  if (startAbs > endAbs) return slots
+  for (let abs = startAbs; abs <= endAbs; abs++) {
+    slots.push({ week: Math.floor(abs / 7), day: abs % 7, period: dailyForm.period })
+  }
+  return slots
+})
 
 async function submitSchedule(payload: Parameters<typeof api.addSchedule>[0], errorRef: typeof weeklyError, noticeRef: typeof weeklyError) {
   errorRef.value = ''
@@ -116,8 +146,13 @@ onMounted(async () => {
     </section>
 
     <section class="panel schedule-rule-form-panel">
-      <div class="panel-head"><div><h2>按周重复</h2><p>设置一次，自动在所选教学周生成机房占用。</p></div></div>
-      <form class="schedule-tool-form" @submit.prevent="addWeeklyRule">
+      <div class="schedule-tabs" role="tablist">
+        <button type="button" role="tab" :aria-selected="tab === 'weekly'" :class="{ active: tab === 'weekly' }" @click="tab = 'weekly'">按周重复</button>
+        <button type="button" role="tab" :aria-selected="tab === 'daily'" :class="{ active: tab === 'daily' }" @click="tab = 'daily'">按天重复</button>
+      </div>
+
+      <form v-if="tab === 'weekly'" class="schedule-tool-form" @submit.prevent="addWeeklyRule">
+        <p class="schedule-tab-desc">设置一次，自动在所选教学周生成机房占用。</p>
         <div class="tool-fields">
           <label>机房<select v-model.number="weeklyForm.roomId"><option v-for="room in adminStore.rooms" :key="room.id" :value="room.id">{{ room.name }}（{{ room.seats }} 座）</option></select></label>
           <label>时段<select v-model.number="weeklyForm.period"><option v-for="(period, index) in periods" :key="period" :value="index">{{ period }}</option></select></label>
@@ -126,15 +161,14 @@ onMounted(async () => {
           <label>结束周<input v-model.number="weeklyForm.endWeek" type="number" min="1" :max="semesterWeeks || 30" required></label>
           <label>重复方式<select v-model="weeklyForm.recurrence"><option value="weekly">每周</option><option value="odd">单周</option><option value="even">双周</option></select></label>
         </div>
+        <SchedulePreview :room-id="weeklyForm.roomId" :room="weeklyRoom" :slots="weeklyPreviewSlots" />
         <button class="primary tool-submit" type="submit" :disabled="!adminStore.rooms.length">添加排期</button>
         <p v-if="weeklyError" class="schedule-form-error">{{ weeklyError }}</p>
         <p v-else-if="weeklyNotice" class="schedule-form-notice">{{ weeklyNotice }}</p>
       </form>
-    </section>
 
-    <section class="panel schedule-rule-form-panel">
-      <div class="panel-head"><div><h2>按天重复</h2><p>指定起止周次，在周次范围内每天都生成机房占用。</p></div></div>
-      <form class="schedule-tool-form" @submit.prevent="addDailyRule">
+      <form v-else class="schedule-tool-form" @submit.prevent="addDailyRule">
+        <p class="schedule-tab-desc">指定起止周次，在周次范围内每天都生成机房占用。</p>
         <div class="tool-fields">
           <label>机房<select v-model.number="dailyForm.roomId"><option v-for="room in adminStore.rooms" :key="room.id" :value="room.id">{{ room.name }}（{{ room.seats }} 座）</option></select></label>
           <label>时段<select v-model.number="dailyForm.period"><option v-for="(period, index) in periods" :key="period" :value="index">{{ period }}</option></select></label>
@@ -143,6 +177,7 @@ onMounted(async () => {
           <label>结束周<input v-model.number="dailyForm.endWeek" type="number" min="1" :max="semesterWeeks || 30" required></label>
           <label>结束周几<select v-model.number="dailyForm.endWeekday"><option v-for="(day, index) in weekdays" :key="day" :value="index">{{ day }}</option></select></label>
         </div>
+        <SchedulePreview :room-id="dailyForm.roomId" :room="dailyRoom" :slots="dailyPreviewSlots" />
         <button class="primary tool-submit" type="submit" :disabled="!adminStore.rooms.length">添加排期</button>
         <p v-if="dailyError" class="schedule-form-error">{{ dailyError }}</p>
         <p v-else-if="dailyNotice" class="schedule-form-notice">{{ dailyNotice }}</p>
