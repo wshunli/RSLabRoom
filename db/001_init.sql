@@ -8,3 +8,8 @@ ALTER TABLE `class`
   MODIFY `cintro` varchar(1000) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
   MODIFY `cname` varchar(500) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
   ENGINE = InnoDB;
+ALTER TABLE `user`
+  ADD COLUMN `name` varchar(50) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
+  ADD COLUMN `email` varchar(100) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
+  ADD COLUMN `phone` varchar(25) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
+  ENGINE = InnoDB;

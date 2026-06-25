@@ -9,6 +9,17 @@ import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateS
 const STATE_BY_CODE: Record<number, string> = { 0: 'pending', 1: 'approved', 2: 'rejected' }
 const SCHEDULING_LOCK = 'rslabroom:scheduling'
 
+function userResponse(row: RowDataPacket) {
+  return {
+    id: String(row.username),
+    username: String(row.username),
+    name: String(row.name || ''),
+    email: String(row.email || ''),
+    phone: String(row.phone || ''),
+    role: '管理员',
+  }
+}
+
 @Injectable()
 export class AdminService {
   constructor(private readonly database: DatabaseService) {}
@@ -255,17 +266,21 @@ export class AdminService {
   }
 
   async getUsers() {
-    const rows = await this.database.query<RowDataPacket[]>('SELECT username FROM user ORDER BY username')
-    return rows.map((row) => ({ id: row.username, username: row.username, role: '管理员' }))
+    const rows = await this.database.query<RowDataPacket[]>('SELECT username, name, email, phone FROM user ORDER BY username')
+    return rows.map(userResponse)
   }
 
   async createUser(body: CreateUserDto) {
     const existing = await this.database.queryOne<RowDataPacket>('SELECT username FROM user WHERE username = ?', [body.username])
     if (existing) throw new ConflictException({ error: '账号已存在' })
-    await this.database.query('INSERT INTO user (username, upwd) VALUES (?, ?)', [
-      body.username, createHash('md5').update(body.password).digest('hex'),
+    await this.database.query('INSERT INTO user (username, upwd, name, email, phone) VALUES (?, ?, ?, ?, ?)', [
+      body.username,
+      createHash('md5').update(body.password).digest('hex'),
+      body.name,
+      body.email,
+      body.phone,
     ])
-    return { id: body.username, username: body.username, role: '管理员' }
+    return userResponse(body as unknown as RowDataPacket)
   }
 
   async updateUser(currentUsername: string, body: UpdateUserDto) {
@@ -276,13 +291,24 @@ export class AdminService {
       if (duplicate) throw new ConflictException({ error: '新账号名已存在' })
     }
     if (body.password) {
-      await this.database.query('UPDATE user SET username = ?, upwd = ? WHERE username = ?', [
-        body.username, createHash('md5').update(body.password).digest('hex'), currentUsername,
+      await this.database.query('UPDATE user SET username = ?, upwd = ?, name = ?, email = ?, phone = ? WHERE username = ?', [
+        body.username,
+        createHash('md5').update(body.password).digest('hex'),
+        body.name,
+        body.email,
+        body.phone,
+        currentUsername,
       ])
     } else {
-      await this.database.query('UPDATE user SET username = ? WHERE username = ?', [body.username, currentUsername])
+      await this.database.query('UPDATE user SET username = ?, name = ?, email = ?, phone = ? WHERE username = ?', [
+        body.username,
+        body.name,
+        body.email,
+        body.phone,
+        currentUsername,
+      ])
     }
-    return { id: body.username, username: body.username, role: '管理员' }
+    return userResponse(body as unknown as RowDataPacket)
   }
 
   async deleteUser(username: string) {

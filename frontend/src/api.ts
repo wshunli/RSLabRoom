@@ -181,10 +181,10 @@ export const api = {
   // ---- 用户管理 -------------------------------------------------------------
   getUsers: () => request<ManagedUser[]>('/admin/users'),
 
-  createUser: (payload: { username: string; password: string }) =>
+  createUser: (payload: UserInput & { password: string }) =>
     request<ManagedUser>('/admin/users', { method: 'POST', body: JSON.stringify(payload) }),
 
-  updateUser: (username: string, payload: { username: string; password?: string }) =>
+  updateUser: (username: string, payload: UserInput & { password?: string }) =>
     request<ManagedUser>(`/admin/users/${encodeURIComponent(username)}`, { method: 'PUT', body: JSON.stringify(payload) }),
 
   deleteUser: (username: string) =>
@@ -219,7 +219,17 @@ export const api = {
 export interface ManagedUser {
   id: string
   username: string
+  name: string
+  email: string
+  phone: string
   role: string
+}
+
+export interface UserInput {
+  username: string
+  name: string
+  email: string
+  phone: string
 }
 
 export type RoomInput = Omit<Room, 'id' | 'equipment'> & {
