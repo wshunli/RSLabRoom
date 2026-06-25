@@ -32,14 +32,35 @@ export class AdminService {
   }
 
   async getApplications(query: ApplicationQueryDto) {
-    const where = query.status === 'pending' ? ' WHERE sstatus = 0'
-      : query.status === 'approved' ? ' WHERE sstatus = 1' : ''
-    const count = await this.database.queryOne<RowDataPacket>(`SELECT COUNT(*) AS total FROM submit${where}`)
+    const conditions: string[] = []
+    const params: unknown[] = []
+    const trimmedDate = query.date?.trim()
+    const courseName = query.courseName?.trim()
+    const teacher = query.teacher?.trim()
+
+    if (query.status === 'pending') conditions.push('s.sstatus = 0')
+    else if (query.status === 'approved') conditions.push('s.sstatus = 1')
+    if (courseName) {
+      conditions.push('s.sname LIKE ?')
+      params.push(`%${courseName}%`)
+    }
+    if (trimmedDate) {
+      conditions.push('EXISTS (SELECT 1 FROM borrow b WHERE b.btimeid = s.stimeid AND b.btime = ?)')
+      params.push(trimmedDate)
+    }
+    if (teacher) {
+      conditions.push('EXISTS (SELECT 1 FROM borrow b WHERE b.btimeid = s.stimeid AND b.bperson LIKE ?)')
+      params.push(`%${teacher}%`)
+    }
+
+    const where = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : ''
+    const count = await this.database.queryOne<RowDataPacket>(`SELECT COUNT(*) AS total FROM submit s${where}`, params)
     const total = Number(count?.total || 0)
     const offset = (query.page - 1) * query.pageSize
     const rows = await this.database.query<RowDataPacket[]>(
       `SELECT sid, stimeid, sperson, sphone, ssoftware, snumer, sname, smore, sstatus
-         FROM submit${where} ORDER BY sid DESC LIMIT ${query.pageSize} OFFSET ${offset}`,
+         FROM submit s${where} ORDER BY sid DESC LIMIT ${query.pageSize} OFFSET ${offset}`,
+      params,
     )
     const items = await Promise.all(rows.map(async (row) => {
       const detailList = await this.buildDetails(String(row.stimeid))

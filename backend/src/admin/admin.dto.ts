@@ -5,11 +5,20 @@ export class ApplicationQueryDto {
   @IsOptional() @IsIn(['pending', 'approved', 'all'])
   status: 'pending' | 'approved' | 'all' = 'all'
 
+  @IsOptional() @IsString() @MaxLength(10)
+  date?: string
+
+  @IsOptional() @IsString() @MaxLength(50)
+  courseName?: string
+
+  @IsOptional() @IsString() @MaxLength(20)
+  teacher?: string
+
   @IsOptional() @Type(() => Number) @IsInt() @Min(1)
   page = 1
 
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
-  pageSize = 10
+  pageSize = 15
 }
 
 export class UpdateSettingsDto {

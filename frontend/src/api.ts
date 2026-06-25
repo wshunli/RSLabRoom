@@ -123,15 +123,29 @@ export const api = {
 
   adminLogout: () => request<{ ok: boolean }>('/admin/logout', { method: 'POST' }),
 
-  // ---- 申请审批（分页 + 状态筛选） ------------------------------------------
-  getApplications: (status: 'pending' | 'approved' | 'all' = 'all', page = 1, pageSize = 10) =>
-    request<{
+  // ---- 申请审批（分页 + 多条件筛选） ----------------------------------------
+  getApplications: (
+    status: 'pending' | 'approved' | 'all' = 'all',
+    page = 1,
+    pageSize = 15,
+    filters: { date?: string; courseName?: string; teacher?: string } = {},
+  ) => {
+    const params = new URLSearchParams({
+      status,
+      page: String(page),
+      pageSize: String(pageSize),
+    })
+    if (filters.date) params.set('date', filters.date)
+    if (filters.courseName) params.set('courseName', filters.courseName)
+    if (filters.teacher) params.set('teacher', filters.teacher)
+    return request<{
       items: Array<BookingRequest & { sid: number; detailList: string[] }>
       total: number
       page: number
       pageSize: number
       pendingTotal: number
-    }>(`/admin/applications?status=${status}&page=${page}&pageSize=${pageSize}`),
+    }>(`/admin/applications?${params.toString()}`)
+  },
 
   approveApplication: (id: string) =>
     request<{ id: string; state: string }>(`/admin/applications/${id}/approve`, { method: 'POST' }),
