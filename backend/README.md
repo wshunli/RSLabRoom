@@ -9,7 +9,7 @@ npm run dev:backend
 npm run dev:frontend
 ```
 
-默认数据库连接沿用历史系统配置，无需创建 `.env`。Vite 开发服务器会把 `/api` 代理到 `http://localhost:3000`。生产构建后，NestJS 会从 `backend/public/` 提供 Vue 页面。
+默认数据库连接沿用历史系统配置，无需额外配置即可运行。Vite 开发服务器会把 `/api` 代理到 `http://localhost:3000`。生产构建后，NestJS 会从 `backend/public/` 提供 Vue 页面。
 
 ## 生产部署（PM2）
 
@@ -48,7 +48,7 @@ pm2 install pm2-logrotate
 
 ## 可选环境变量
 
-数据库和端口均有代码内置默认值，不创建 `.env` 也可运行。如需在不同环境覆盖，可复制 `.env.example` 并设置 `DB_HOST`、`DB_USER`、`DB_PASSWORD`、`DB_NAME`、`PORT` 或 `JWT_SECRET`。
+数据库和端口均有代码内置默认值，无需额外配置文件即可运行。如需在不同环境覆盖，通过操作系统环境变量设置 `DB_HOST`、`DB_USER`、`DB_PASSWORD`、`DB_NAME`、`PORT` 或 `JWT_SECRET` 即可。
 
 未提供 `JWT_SECRET` 时，服务每次启动会自动生成临时密钥，因此重启后已有登录 token 会失效；单机部署不受影响。
 
