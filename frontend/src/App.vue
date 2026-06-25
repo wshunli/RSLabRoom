@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from './components/AppHeader.vue'
 import AdminLogin from './components/AdminLogin.vue'
+import { api } from './api'
 import type { AdminUser } from './types'
 
 const router = useRouter()
@@ -10,6 +11,7 @@ const router = useRouter()
 const mobileNav = ref(false)
 const showAdminLogin = ref(false)
 const admin = ref<AdminUser | null>(readAdminSession())
+const contact = ref({ name: '', phone: '' })
 
 function readAdminSession(): AdminUser | null {
   const value = sessionStorage.getItem('room-admin')
@@ -34,6 +36,15 @@ function handleUnauthorized() {
 }
 onMounted(() => window.addEventListener('admin-unauthorized', handleUnauthorized))
 onUnmounted(() => window.removeEventListener('admin-unauthorized', handleUnauthorized))
+
+onMounted(async () => {
+  try {
+    const config = await api.getConfig()
+    contact.value = config.contact
+  } catch {
+    // 配置加载失败时保留默认联系方式
+  }
+})
 
 function openAdminLogin() {
   showAdminLogin.value = true
@@ -67,7 +78,9 @@ function handleLogout() {
     <router-view />
     <footer>
       <span>© 2026 武汉大学遥感信息工程学院实验教学中心</span>
-      <span>服务电话：027-6877 0000</span>
+      <span>
+        联系人：<template v-if="contact.name">{{ contact.name }}　</template>{{ contact.phone || '027-6877 0000' }}
+      </span>
     </footer>
     <AdminLogin v-if="showAdminLogin" @close="showAdminLogin = false" @success="handleLogin" />
   </div>
