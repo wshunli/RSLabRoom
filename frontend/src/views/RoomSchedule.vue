@@ -291,7 +291,7 @@ watch(roomId, init)
                   :aria-pressed="isSelected(w, dayIndex, periodIndex)"
                   @click="onSlotClick(w, dayIndex, periodIndex)"
                 >
-                  <template v-if="isBusy(w, dayIndex, periodIndex)"><span>课程</span><small>{{ courseName(w, dayIndex, periodIndex) }}</small></template>
+                  <template v-if="isBusy(w, dayIndex, periodIndex)"><span>{{ courseName(w, dayIndex, periodIndex) }}</span></template>
                   <template v-else-if="isPast(w, dayIndex)"><span>空闲</span></template>
                   <template v-else-if="isSelected(w, dayIndex, periodIndex)"><span>已选择</span><small>再次点击取消</small></template>
                   <template v-else><span>空闲</span><small>可预约</small></template>

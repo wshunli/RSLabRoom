@@ -64,7 +64,7 @@ function isSelected(day: number, period: number) {
           :aria-pressed="isSelected(dayIndex, periodIndex)"
           @click="onClick(dayIndex, periodIndex)"
         >
-          <template v-if="isBusy(dayIndex, periodIndex)"><span>课程</span><small>{{ courseName(dayIndex, periodIndex) }}</small></template>
+          <template v-if="isBusy(dayIndex, periodIndex)"><span>{{ courseName(dayIndex, periodIndex) }}</span></template>
           <template v-else-if="isPast(dayIndex)"></template>
           <template v-else-if="isSelected(dayIndex, periodIndex)"><span>已选择</span><small>再次点击取消</small></template>
           <template v-else><span>空闲</span><small>可预约</small></template>

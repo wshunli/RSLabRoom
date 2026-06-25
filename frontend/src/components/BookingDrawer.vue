@@ -29,9 +29,9 @@ interface BookingForm {
 const form = reactive<BookingForm>({
   applicantName: '',
   phone: '',
-  attendees: 1,
+  attendees: 30,
   courseName: '',
-  requiredSoftware: '',
+  requiredSoftware: '无',
   remarks: '',
 })
 
@@ -66,7 +66,7 @@ function submitForm() {
         </div>
         <div class="form-grid">
           <label>申请姓名<input v-model.trim="form.applicantName" name="applicantName" autocomplete="name" required></label>
-          <label>申请电话<input v-model.trim="form.phone" name="phone" type="tel" autocomplete="tel" required></label>
+          <label>联系电话<input v-model.trim="form.phone" name="phone" type="tel" autocomplete="tel" required></label>
           <label>上课人数<input v-model.number="form.attendees" name="attendees" type="number" min="1" :max="Math.min(...props.values.map((value) => value.room.seats))" required></label>
           <label>课程名称<input v-model.trim="form.courseName" name="courseName" required></label>
         </div>

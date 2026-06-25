@@ -185,7 +185,7 @@ function onCellClick(item: WeekItem, day: number, period: number) {
               >
                 <template v-if="cellState(w.week, di, pi) === 'conflict'"><span>冲突</span><small>已占用</small></template>
                 <template v-else-if="cellState(w.week, di, pi) === 'add'"><span>待添加</span><small>本次排期</small></template>
-                <template v-else-if="cellState(w.week, di, pi) === 'busy'"><span>课程</span><small>{{ courseName(w.week, di, pi) }}</small></template>
+                <template v-else-if="cellState(w.week, di, pi) === 'busy'"><span>{{ courseName(w.week, di, pi) }}</span></template>
                 <template v-else><span>空闲</span><small>可预约</small></template>
               </div>
             </div>
@@ -268,7 +268,7 @@ function onCellClick(item: WeekItem, day: number, period: number) {
   align-items: center;
   min-width: 0;
 }
-.schedule-line .cell span { font-size: 11px; font-weight: 600; }
+.schedule-line .cell span { font-size: 12px; font-weight: 600; max-width: 94%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .schedule-line .cell small {
   font-size: 8px;
   opacity: .75;
