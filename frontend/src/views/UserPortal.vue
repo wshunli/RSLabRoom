@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import {
-  CalendarCheck2, CalendarDays, ChevronLeft, ChevronRight, Clock3, DoorOpen,
+  CalendarCheck2, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Clock3, DoorOpen,
   Layers, Phone, Search, Sparkles, UserRound,
 } from '@lucide/vue'
 import BookingDrawer from '../components/BookingDrawer.vue'
@@ -25,6 +25,16 @@ const busySlots = ref<Set<string>>(new Set())
 const slotInfo = ref<Map<string, { courseName: string; teacher: string; date: string }>>(new Map())
 const week = ref(1)
 const totalWeeks = ref(0)
+const currentTeachingWeek = ref(0)
+const weekPickerOpen = ref(false)
+// 移动端联系人按钮默认隐藏，滚动接近底部时再露出；点击展开为完整卡片。
+const nearBottom = ref(false)
+const contactExpanded = ref(false)
+function onScroll() {
+  const doc = document.documentElement
+  nearBottom.value = window.innerHeight + window.scrollY >= doc.scrollHeight - 160
+  if (!nearBottom.value) contactExpanded.value = false
+}
 const rangeStart = ref('')
 const rangeEnd = ref('')
 const contact = ref({ name: '', phone: '' })
@@ -84,11 +94,22 @@ async function changeWeek(delta: number) {
   }
 }
 
+async function selectWeek(target: number) {
+  weekPickerOpen.value = false
+  if (target === week.value) return
+  try {
+    await loadAvailability(target)
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '加载失败'
+  }
+}
+
 onMounted(async () => {
   try {
     const [config, rooms] = await Promise.all([api.getConfig(), api.getRooms()])
     contact.value = config.contact
     totalWeeks.value = config.totalWeeks
+    currentTeachingWeek.value = config.currentWeek
     roomList.value = rooms
     await loadAvailability(config.currentWeek)
   } catch (err) {
@@ -96,6 +117,16 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+onMounted(() => {
+  window.addEventListener('scroll', onScroll, { passive: true })
+  window.addEventListener('resize', onScroll, { passive: true })
+  onScroll()
+})
+onUnmounted(() => {
+  window.removeEventListener('scroll', onScroll)
+  window.removeEventListener('resize', onScroll)
 })
 
 function toggleSlot(room: SelectedSlot['room'], day: number, period: number) {
@@ -189,8 +220,34 @@ function finishBooking() {
         <div><span class="kicker">ROOM AVAILABILITY</span><h2>本周机房安排</h2><p>点击空闲时段即可发起预约申请</p></div>
         <div class="week-switch">
           <button aria-label="上一周" @click="changeWeek(-1)"><ChevronLeft :size="17" /></button>
-          <span><CalendarDays :size="17" />{{ weekLabel }} <b>第 {{ week }} 周</b></span>
+          <button
+            type="button"
+            class="week-current"
+            aria-haspopup="listbox"
+            :aria-expanded="weekPickerOpen"
+            @click="weekPickerOpen = !weekPickerOpen"
+          >
+            <CalendarDays :size="17" />{{ weekLabel }} <b>第 {{ week }} 周</b>
+            <ChevronDown :size="14" class="week-caret" :class="{ open: weekPickerOpen }" />
+          </button>
           <button aria-label="下一周" @click="changeWeek(1)"><ChevronRight :size="17" /></button>
+          <template v-if="weekPickerOpen">
+            <div class="week-pop-backdrop" @click="weekPickerOpen = false" />
+            <div class="week-pop" role="listbox" aria-label="选择教学周">
+              <div class="week-pop-grid">
+                <button
+                  v-for="w in totalWeeks"
+                  :key="w"
+                  type="button"
+                  role="option"
+                  :aria-selected="w === week"
+                  :class="{ active: w === week, current: w === currentTeachingWeek }"
+                  :title="w === currentTeachingWeek ? '本周' : ''"
+                  @click="selectWeek(w)"
+                >{{ w }}</button>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
       <div class="filters">
@@ -226,9 +283,12 @@ function finishBooking() {
       <button class="primary" @click="drawerOpen = true">填写预约信息</button>
     </div>
 
-    <aside v-if="contact.name" class="portal-contact" :class="{ raised: selected.length }" aria-label="联系人信息">
-      <span class="portal-contact-icon"><Phone /></span>
-      <div><small><UserRound />首页联系人</small><strong>{{ contact.name }}</strong><a :href="`tel:${contact.phone}`">{{ contact.phone }}</a></div>
+    <aside v-if="contact.name" class="portal-contact" :class="{ raised: selected.length, revealed: nearBottom, expanded: contactExpanded }" aria-label="联系人信息">
+      <button type="button" class="portal-contact-btn" :aria-expanded="contactExpanded" @click="contactExpanded = !contactExpanded">
+        <span class="portal-contact-icon"><Phone /></span>
+        <span class="portal-contact-label">联系人</span>
+      </button>
+      <div class="portal-contact-body"><small><UserRound />联系人</small><strong>{{ contact.name }}</strong><a :href="`tel:${contact.phone}`">{{ contact.phone }}</a></div>
     </aside>
 
     <BookingDrawer
