@@ -55,6 +55,7 @@ export interface AvailabilitySlot {
   period: number
   courseName: string
   teacher: string
+  phone: string
   date: string
 }
 

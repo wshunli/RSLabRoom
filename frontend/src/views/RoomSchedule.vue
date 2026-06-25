@@ -29,7 +29,7 @@ interface WeekSchedule {
   rangeEnd: string
   days: { week: string; date: string }[]
   busy: Set<string>
-  info: Map<string, { courseName: string; teacher: string; date: string }>
+  info: Map<string, { courseName: string; teacher: string; phone: string; date: string }>
 }
 
 const loadedWeeks = ref<WeekSchedule[]>([])
@@ -64,11 +64,11 @@ function buildDays(rangeStart: string) {
 
 function mapWeek(data: AvailabilityResponse): WeekSchedule {
   const busy = new Set<string>()
-  const info = new Map<string, { courseName: string; teacher: string; date: string }>()
+  const info = new Map<string, { courseName: string; teacher: string; phone: string; date: string }>()
   for (const slot of data.slots) {
     if (slot.roomId !== roomId.value) continue
     busy.add(slot.key)
-    info.set(slot.key, { courseName: slot.courseName, teacher: slot.teacher, date: slot.date })
+    info.set(slot.key, { courseName: slot.courseName, teacher: slot.teacher, phone: slot.phone, date: slot.date })
   }
   return {
     week: data.week,
@@ -101,6 +101,7 @@ interface SlotDetail {
   building: string
   courseName: string
   teacher: string
+  phone: string
   date: string
   dayLabel: string
   week: number
@@ -123,6 +124,7 @@ function openDetail(w: WeekSchedule, day: number, period: number) {
     building: room.value.building,
     courseName: info.courseName,
     teacher: info.teacher,
+    phone: info.phone,
     date: info.date || w.days[day].date,
     dayLabel: w.days[day].week,
     week: w.week,

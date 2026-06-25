@@ -44,7 +44,7 @@ export class PublicService {
     const week = requestedWeek || currentWeek(semesterStart)
     const range = weekRange(semesterStart, week)
     const rows = await this.database.query<RowDataPacket[]>(
-      'SELECT bid, btime, bname, bperson, tag, bclassid FROM borrow WHERE btime >= ? AND btime <= ? AND status = 1',
+      'SELECT bid, btime, bname, bperson, bphone, tag, bclassid FROM borrow WHERE btime >= ? AND btime <= ? AND status = 1',
       [range.start, range.end],
     )
     const slots = rows.flatMap((row) => {
@@ -59,6 +59,7 @@ export class PublicService {
         period,
         courseName: row.bname,
         teacher: row.bperson,
+        phone: row.bphone,
         date: String(row.btime).slice(0, 10),
       }]
     })

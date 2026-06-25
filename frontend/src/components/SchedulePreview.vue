@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { CalendarDays, ChevronLeft, ChevronRight, MapPin, Users } from '@lucide/vue'
+import { CalendarDays, MapPin, Users } from '@lucide/vue'
 import { api, type AvailabilityResponse } from '../api'
 import { periods, weekdays } from '../data'
 import type { Room } from '../types'
+import SlotDetailDialog from './SlotDetailDialog.vue'
 
 // 排期预览：以首页（预约大厅）的单行机房样式，只读地展示「加入本次排期后」
-// 该机房某一教学周的占用情况。可在受影响的教学周之间切换；不含任何预约逻辑。
+// 该机房所有受影响教学周的占用情况；不含任何预约逻辑。
 const props = defineProps<{
   roomId: number
   room: Room | null
@@ -27,27 +28,20 @@ const slotsByWeek = computed(() => {
 // 受本次排期影响的教学周（升序）。
 const weeks = computed(() => [...slotsByWeek.value.keys()].sort((a, b) => a - b))
 
-// 当前展示第几个受影响周。周次范围变化时把游标夹在有效区间内。
-const index = ref(0)
-watch(weeks, (list) => {
-  if (index.value >= list.length) index.value = Math.max(0, list.length - 1)
-}, { immediate: true })
-
-const currentWeek = computed(() => weeks.value[index.value] ?? 0)
-
-// 以教学周为键缓存可用性响应（含全部机房），切换机房无需重新拉取。
+// 以教学周为键缓存可用性响应（含全部机房），表单变化时只拉取新增周。
 const cache = ref(new Map<number, AvailabilityResponse>())
 const loading = ref(false)
 const error = ref('')
 
-async function ensureWeek(week: number) {
-  if (!week || cache.value.has(week)) return
+async function ensureWeeks(list: number[]) {
+  const missing = list.filter((week) => week && !cache.value.has(week))
+  if (!missing.length) return
   loading.value = true
   error.value = ''
   try {
-    const res = await api.getAvailability(week)
+    const responses = await Promise.all(missing.map((week) => api.getAvailability(week)))
     const next = new Map(cache.value)
-    next.set(week, res)
+    for (const res of responses) next.set(res.week, res)
     cache.value = next
   } catch (err) {
     error.value = err instanceof Error ? err.message : '预览加载失败'
@@ -56,12 +50,9 @@ async function ensureWeek(week: number) {
   }
 }
 
-watch(currentWeek, (w) => ensureWeek(w), { immediate: true })
+watch(weeks, (list) => ensureWeeks(list), { immediate: true })
 
-const data = computed(() => cache.value.get(currentWeek.value) ?? null)
-
-const days = computed(() => {
-  const start = data.value?.range.start ?? ''
+function daysFor(start: string) {
   if (!start) return weekdays.map((name) => ({ week: name, date: '' }))
   const [y, m, d] = start.split('-').map(Number)
   return weekdays.map((name, i) => {
@@ -69,46 +60,74 @@ const days = computed(() => {
     const md = `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
     return { week: name, date: md }
   })
-})
+}
 
-const weekLabel = computed(() => {
-  const dd = data.value
-  return dd ? `${dd.range.start.replace(/-/g, '.')} — ${dd.range.end.replace(/-/g, '.')}` : ''
-})
-
-// 当前周该机房已有占用：键 `${day}-${period}` -> 课程名。
-const busy = computed(() => {
-  const map = new Map<string, string>()
-  const dd = data.value
+interface SlotInfo { courseName: string; teacher: string; phone: string; date: string }
+function busyFor(week: number) {
+  const map = new Map<string, SlotInfo>()
+  const dd = cache.value.get(week)
   if (dd) {
     for (const slot of dd.slots) {
       if (slot.roomId !== props.roomId) continue
-      map.set(`${slot.day}-${slot.period}`, slot.courseName || '已占用')
+      map.set(`${slot.day}-${slot.period}`, {
+        courseName: slot.courseName || '已占用',
+        teacher: slot.teacher,
+        phone: slot.phone,
+        date: slot.date,
+      })
     }
   }
   return map
-})
-
-const addSet = computed(() => slotsByWeek.value.get(currentWeek.value) ?? new Set<string>())
+}
 
 type CellState = 'free' | 'busy' | 'add' | 'conflict'
-function cellState(day: number, period: number): CellState {
+function cellState(week: number, day: number, period: number): CellState {
   const key = `${day}-${period}`
-  const a = addSet.value.has(key)
-  const b = busy.value.has(key)
+  const a = (slotsByWeek.value.get(week) ?? new Set<string>()).has(key)
+  const b = busyFor(week).has(key)
   if (a && b) return 'conflict'
   if (a) return 'add'
   if (b) return 'busy'
   return 'free'
 }
-function courseName(day: number, period: number) {
-  return busy.value.get(`${day}-${period}`) || '已占用'
+function courseName(week: number, day: number, period: number) {
+  return busyFor(week).get(`${day}-${period}`)?.courseName || '已占用'
 }
 
-function step(delta: number) {
-  const next = index.value + delta
-  if (next < 0 || next >= weeks.value.length) return
-  index.value = next
+type WeekItem = { week: number; label: string; days: { week: string; date: string }[] }
+const weekItems = computed<WeekItem[]>(() => weeks.value.map((week) => {
+  const data = cache.value.get(week)
+  return {
+    week,
+    label: data ? `${data.range.start.replace(/-/g, '.')} — ${data.range.end.replace(/-/g, '.')}` : '加载中...',
+    days: daysFor(data?.range.start ?? ''),
+  }
+}))
+
+const allLoaded = computed(() => weeks.value.every((week) => cache.value.has(week)))
+
+// 点击已占用（含与本次排期冲突）的单元格，弹出课程详情
+const slotDetail = ref<{
+  roomName: string; building: string; courseName: string; teacher: string
+  phone: string; date: string; dayLabel: string; week: number; period: number
+} | null>(null)
+
+function onCellClick(item: WeekItem, day: number, period: number) {
+  const state = cellState(item.week, day, period)
+  if (state !== 'busy' && state !== 'conflict') return
+  const info = busyFor(item.week).get(`${day}-${period}`)
+  if (!info) return
+  slotDetail.value = {
+    roomName: props.room?.name ?? '',
+    building: props.room?.building ?? '',
+    courseName: info.courseName,
+    teacher: info.teacher,
+    phone: info.phone,
+    date: info.date || item.days[day]?.date || '',
+    dayLabel: item.days[day]?.week ?? '',
+    week: item.week,
+    period,
+  }
 }
 </script>
 
@@ -122,43 +141,61 @@ function step(delta: number) {
         <span><i class="add" />待添加</span>
         <span><i class="conflict" />冲突</span>
       </div>
-      <div v-if="weeks.length" class="week-switch">
-        <button type="button" aria-label="上一周" :disabled="index === 0" @click="step(-1)"><ChevronLeft :size="17" /></button>
-        <span><CalendarDays :size="17" />{{ weekLabel || '加载中…' }} <b>第 {{ currentWeek }} 周</b></span>
-        <button type="button" aria-label="下一周" :disabled="index >= weeks.length - 1" @click="step(1)"><ChevronRight :size="17" /></button>
+    </div>
+
+    <div class="preview-schedule-layout">
+      <div class="preview-room-col">
+        <div class="room-meta">
+          <div class="room-number">{{ String(room?.id ?? 0).padStart(2, '0') }}</div>
+          <div>
+            <h3>{{ room?.name || '未选择机房' }}</h3>
+            <p><MapPin :size="14" />{{ room?.building }}</p>
+            <div class="room-tags">
+              <span><Users :size="13" />{{ room?.seats }} 座</span>
+              <span v-if="room?.audience">{{ room.audience }}</span>
+            </div>
+          </div>
+        </div>
+        <slot name="actions" />
+      </div>
+      <div class="preview-week-area">
+        <p v-if="!slots.length" class="schedule-preview-empty">填写排期参数后，这里会以首页样式展示加入排期后的机房占用情况。</p>
+        <p v-else-if="error" class="schedule-preview-empty error">{{ error }}</p>
+        <p v-else-if="loading && !allLoaded" class="schedule-preview-empty">正在加载排期预览...</p>
+        <div v-else class="week-schedule-list preview-week-list">
+          <article v-for="w in weekItems" :key="w.week" class="week-card">
+          <header class="week-card-head">
+            <CalendarDays :size="16" />
+            <strong>第 {{ w.week }} 周</strong>
+            <small>{{ w.label }}</small>
+          </header>
+          <div class="schedule">
+            <div class="schedule-head">
+              <span class="period-label">时段</span>
+              <span v-for="day in w.days" :key="day.week"><b>{{ day.week }}</b><small>{{ day.date }}</small></span>
+            </div>
+            <div v-for="(period, pi) in periods" :key="period" class="schedule-line">
+              <span class="period-label">{{ period }}</span>
+              <div
+                v-for="(_, di) in w.days"
+                :key="di"
+                class="cell"
+                :class="[cellState(w.week, di, pi), { clickable: cellState(w.week, di, pi) === 'busy' || cellState(w.week, di, pi) === 'conflict' }]"
+                @click="onCellClick(w, di, pi)"
+              >
+                <template v-if="cellState(w.week, di, pi) === 'conflict'"><span>冲突</span><small>已占用</small></template>
+                <template v-else-if="cellState(w.week, di, pi) === 'add'"><span>待添加</span><small>本次排期</small></template>
+                <template v-else-if="cellState(w.week, di, pi) === 'busy'"><span>课程</span><small>{{ courseName(w.week, di, pi) }}</small></template>
+                <template v-else><span>空闲</span><small>可预约</small></template>
+              </div>
+            </div>
+          </div>
+        </article>
+        </div>
       </div>
     </div>
 
-    <p v-if="!slots.length" class="schedule-preview-empty">填写排期参数后，这里会以首页样式展示加入排期后的机房占用情况。</p>
-    <p v-else-if="error" class="schedule-preview-empty error">{{ error }}</p>
-    <article v-else class="room-row preview-room-row">
-      <div class="room-meta">
-        <div class="room-number">{{ String(room?.id ?? 0).padStart(2, '0') }}</div>
-        <div>
-          <h3>{{ room?.name || '未选择机房' }}</h3>
-          <p><MapPin :size="14" />{{ room?.building }}</p>
-          <div class="room-tags">
-            <span><Users :size="13" />{{ room?.seats }} 座</span>
-            <span v-if="room?.audience">{{ room.audience }}</span>
-          </div>
-        </div>
-      </div>
-      <div class="schedule">
-        <div class="schedule-head">
-          <span class="period-label">时段</span>
-          <span v-for="day in days" :key="day.week"><b>{{ day.week }}</b><small>{{ day.date }}</small></span>
-        </div>
-        <div v-for="(period, pi) in periods" :key="period" class="schedule-line">
-          <span class="period-label">{{ period }}</span>
-          <div v-for="(_, di) in days" :key="di" class="cell" :class="cellState(di, pi)">
-            <template v-if="cellState(di, pi) === 'conflict'"><span>冲突</span><small>已占用</small></template>
-            <template v-else-if="cellState(di, pi) === 'add'"><span>待添加</span><small>本次排期</small></template>
-            <template v-else-if="cellState(di, pi) === 'busy'"><span>课程</span><small>{{ courseName(di, pi) }}</small></template>
-            <template v-else><span>空闲</span></template>
-          </div>
-        </div>
-      </div>
-    </article>
+    <SlotDetailDialog v-if="slotDetail" v-bind="slotDetail" @close="slotDetail = null" />
   </section>
 </template>
 
@@ -184,7 +221,6 @@ function step(delta: number) {
   font-weight: 500;
 }
 .schedule-preview-bar .legend { margin-left: 0; }
-.schedule-preview-bar .week-switch { margin-left: auto; }
 .legend i.add { background: var(--green); border: 0; }
 .legend i.conflict { background: #f3b8ac; border: 0; }
 
@@ -198,8 +234,30 @@ function step(delta: number) {
 }
 .schedule-preview-empty.error { color: #a64231; }
 
-/* 复用全局 .room-row / .schedule 网格，仅自定义只读格子（不可点击、无 hover 反馈） */
-.preview-room-row:hover { box-shadow: none; border-color: var(--line); }
+.preview-schedule-layout {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+.preview-room-col {
+  position: sticky;
+  top: 88px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.preview-schedule-layout .room-meta {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+/* 机房卡片下方的「添加排期」按钮与提示，跟随左列宽度铺满 */
+.preview-room-col :deep(.tool-submit) { width: 100%; align-self: stretch; }
+.preview-week-area { min-width: 0; }
+.preview-week-list { min-width: 0; }
+.preview-week-list .week-card { border-radius: 12px; }
 .schedule-line .cell {
   height: 39px;
   border-radius: 7px;
@@ -218,10 +276,18 @@ function step(delta: number) {
   white-space: nowrap;
   max-width: 92%;
 }
-/* 与首页一致：空闲薄荷绿、已占用灰 */
+/* 与预约大厅一致：空闲薄荷绿、已占用琥珀黄 */
 .schedule-line .cell.free { background: #e3f2ec; color: #21634e; border-color: #c4e1d5; }
-.schedule-line .cell.busy { background: #eef1ef; color: #8a958f; }
+.schedule-line .cell.busy { background: #fff0d7; color: #a66b17; border-color: #f3dcae; }
 /* 待添加沿用首页「已选择」的实心绿；冲突用警示红 */
 .schedule-line .cell.add { background: var(--green); color: #fff; border-color: var(--green); box-shadow: 0 0 0 2px #cce3da; }
 .schedule-line .cell.conflict { background: #fff0ed; color: #a64231; border-color: #f0c4bb; }
+/* 已占用 / 冲突可点击查看课程详情 */
+.schedule-line .cell.clickable { cursor: pointer; transition: .15s; }
+.schedule-line .cell.busy.clickable:hover { background: #ffe6bd; color: #8a560f; }
+.schedule-line .cell.conflict.clickable:hover { background: #ffe4dd; }
+@media(max-width:900px){
+  .preview-schedule-layout { grid-template-columns: 1fr; }
+  .preview-room-col { position: static; }
+}
 </style>
