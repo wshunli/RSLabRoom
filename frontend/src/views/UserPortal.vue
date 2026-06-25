@@ -7,9 +7,13 @@ import {
 import BookingDrawer from '../components/BookingDrawer.vue'
 import RoomRow from '../components/RoomRow.vue'
 import SlotDetailDialog from '../components/SlotDetailDialog.vue'
+import CountUp from '../components/CountUp.vue'
 import { api } from '../api'
 import { isDayPast, periods, weekdays } from '../data'
 import type { Room, SelectedSlot } from '../types'
+
+// 首页顶部三个指标的滚动动效组件引用，悬停时重新播放。
+const heroStat = ref<InstanceType<typeof CountUp>[]>([])
 
 const query = ref('')
 const capacity = ref('全部容量')
@@ -189,9 +193,9 @@ function finishBooking() {
         <p>实时查看实验教学中心机房使用情况，在线提交申请，审批进度随时可查。</p>
       </div>
       <div class="hero-stats">
-        <div><span class="stat-icon mint"><DoorOpen /></span><strong>{{ roomList.length }}</strong><small>开放机房</small></div>
-        <div><span class="stat-icon amber"><Clock3 /></span><strong>{{ freeSlotCount }}</strong><small>本周空闲时段</small></div>
-        <div><span class="stat-icon lilac"><Layers /></span><strong>{{ busySlots.size }}</strong><small>本周已排课程</small></div>
+        <div @mouseenter="heroStat[0]?.play()"><span class="stat-icon mint"><DoorOpen /></span><strong><CountUp :ref="(el: any) => (heroStat[0] = el)" :value="roomList.length" /></strong><small>开放机房</small></div>
+        <div @mouseenter="heroStat[1]?.play()"><span class="stat-icon amber"><Clock3 /></span><strong><CountUp :ref="(el: any) => (heroStat[1] = el)" :value="freeSlotCount" /></strong><small>本周空闲时段</small></div>
+        <div @mouseenter="heroStat[2]?.play()"><span class="stat-icon lilac"><Layers /></span><strong><CountUp :ref="(el: any) => (heroStat[2] = el)" :value="busySlots.size" /></strong><small>本周已排课程</small></div>
       </div>
     </section>
 

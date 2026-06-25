@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  ArrowLeft, CalendarCheck2, CalendarDays, Clock3, MapPin, Phone, Search, UserRound, Users,
+  ArrowLeft, CalendarCheck2, CalendarDays, Clock3, MapPin, Search, Users,
 } from '@lucide/vue'
 import BookingDrawer from '../components/BookingDrawer.vue'
 import SlotDetailDialog from '../components/SlotDetailDialog.vue'
@@ -21,7 +21,6 @@ const loading = ref(true)
 const error = ref('')
 const room = ref<Room | null>(null)
 const totalWeeks = ref(0)
-const contact = ref({ name: '', phone: '' })
 
 interface WeekSchedule {
   week: number
@@ -220,7 +219,6 @@ async function init() {
       error.value = '未找到该机房'
       return
     }
-    contact.value = config.contact
     totalWeeks.value = Math.max(config.totalWeeks, 1)
     await loadMore()
   } catch (err) {
@@ -314,11 +312,6 @@ watch(roomId, init)
         <button class="clear-selection" @click="selected = []">清空</button>
         <button class="primary" @click="drawerOpen = true">填写预约信息</button>
       </div>
-
-      <aside v-if="contact.name" class="portal-contact" :class="{ raised: selected.length }" aria-label="联系人信息">
-        <span class="portal-contact-icon"><Phone /></span>
-        <div><small><UserRound />首页联系人</small><strong>{{ contact.name }}</strong><a :href="`tel:${contact.phone}`">{{ contact.phone }}</a></div>
-      </aside>
 
       <BookingDrawer
         v-if="drawerOpen && selected.length"
