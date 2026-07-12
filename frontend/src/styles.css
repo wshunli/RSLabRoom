@@ -19,9 +19,10 @@
 .semesters-form{padding:22px}
 .semesters-form .panel-head h2{display:flex;align-items:center;gap:7px}.semesters-form .panel-head h2 svg{width:16px;height:16px;color:var(--green)}
 .semester-row{padding:13px 15px;border:1px solid var(--line);border-radius:11px;background:#fbfcfb;margin-top:10px}.semester-row.current{border-color:#8fbfa9;background:#f2f9f5}.semester-row-title{display:flex;align-items:center;gap:9px}.semester-row-title b{font-size:13px;color:#33403a}.semester-fields{display:flex;flex-wrap:wrap;gap:12px;margin-top:11px}.semester-field{display:flex;flex-direction:column;gap:5px}.semester-field>span:first-child{font-size:12px;color:#68756f;font-weight:600}.semester-field input,.semester-field select{height:38px;border:1px solid var(--line);border-radius:9px;padding:0 10px;outline:0;background:#fff}.semester-field input:focus,.semester-field select:focus{border-color:#70a58f;box-shadow:0 0 0 3px #e5f2ed}.semester-field .setting-suffix input{height:38px;width:76px}.semester-current-tag{background:#dcefe6;color:#24705a;font-size:12px;font-weight:600;border-radius:999px;padding:3px 10px}.semester-error{color:#a05252;font-size:12px}
+.dashboard-content-grid{display:grid;grid-template-columns:minmax(300px,.86fr) minmax(0,1.54fr);gap:16px;align-items:stretch}.dashboard-content-grid .semester-preview{position:static}.dashboard-today-panel{min-width:0}
 .semester-year-row{display:flex;align-items:center;gap:14px;margin-top:4px}.semester-year-row>span:first-child{color:#46534d;font-size:13px;font-weight:600}.semester-year-row input{height:40px;width:96px;border:1px solid var(--line);border-radius:9px;padding:0 11px;outline:0;background:#fff}.semester-year-row input:focus{border-color:#70a58f;box-shadow:0 0 0 3px #e5f2ed}.semester-year-row .setting-suffix{font-size:13px;color:#46534d;font-weight:600}
 /* 学期设置：统一表单控件层级与卡片质感 */
-.semesters-layout{display:block;max-width:760px}
+.semesters-layout{display:grid;grid-template-columns:minmax(520px,.9fr) minmax(460px,1.3fr);gap:20px;width:100%;max-width:none;align-items:stretch}
 .semesters-form{box-shadow:0 8px 24px rgba(31,67,53,.04)}
 .semesters-form .panel-head{margin:-22px -22px 20px;padding:20px 22px;background:linear-gradient(135deg,#fbfdfc,#f4f8f6);border-radius:15px 15px 0 0}
 .semesters-form .panel-head p{margin:5px 0 0;color:var(--muted);font-size:12px;line-height:1.6}
@@ -29,7 +30,7 @@
 .semester-row:hover{border-color:#bfd3ca;box-shadow:0 6px 18px rgba(31,67,53,.05)}
 .semester-row.current{border-color:#75ad96;background:linear-gradient(135deg,#f3faf6,#fbfdfc);box-shadow:inset 3px 0 #3c8a6e}
 .semester-row-title b{font-size:14px;color:#26352f}
-.semester-fields{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(105px,.7fr);gap:12px;margin-top:13px}
+.semester-fields{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,.7fr) minmax(0,.7fr);gap:12px;margin-top:13px}
 .semester-field{gap:7px;min-width:0}
 .semester-field>span:first-child{display:flex;align-items:center;gap:5px}
 .semester-field>span:first-child svg{width:13px;height:13px;color:#739486}
@@ -39,10 +40,69 @@
 .semester-field .setting-suffix{width:100%;gap:8px}
 .semester-field .setting-suffix input{height:42px;width:100%;min-width:0}
 .semester-year-row{flex-direction:column;align-items:flex-start;gap:8px}
-.semester-year-row>span:first-child{font-size:12px}
+.semester-year-label{font-size:14px;color:#26352f;font-weight:600;cursor:pointer}
+.semester-year-controls{display:flex;align-items:center;gap:12px;width:100%}
 .semester-year-row input{height:44px;width:112px;border-color:#d9e2dd;border-radius:10px;color:#293832;font-weight:600;transition:.2s}
 .semester-year-row input:focus{border-color:#4f9277}
-.semester-year-row .setting-suffix{width:100%;padding:10px 12px;background:#f6f9f7;border:1px solid #e5ebe7;border-radius:12px}
+.semester-year-row .setting-suffix{flex:1;width:auto;padding:10px 12px;background:#f6f9f7;border:1px solid #e5ebe7;border-radius:12px}
+.semester-year-save{height:44px;display:flex;align-items:center;gap:7px;white-space:nowrap}
+.semester-year-save svg{width:16px;height:16px}
+.semester-preview{padding:22px;box-shadow:0 8px 24px rgba(31,67,53,.04)}
+.semester-preview-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding-bottom:18px;border-bottom:1px solid #edf0ee}
+.semester-preview-head h2{margin:6px 0 3px;font-size:20px}
+.semester-preview-head p{margin:0;color:var(--muted);font-size:12px}
+.semester-preview-icon{width:28px;height:28px;color:var(--green);padding:5px;background:#e7f3ed;border-radius:9px;flex:0 0 auto}
+.semester-preview-year{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:18px 0 15px}
+.semester-preview-year span{color:var(--muted);font-size:12px}
+.semester-preview-year strong{font-size:22px;color:var(--green);letter-spacing:.02em}
+.semester-preview-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:13px 0;border-top:1px solid #edf0ee;border-bottom:1px solid #edf0ee}
+.semester-preview-summary div{display:flex;flex-direction:column;gap:3px;padding-left:10px;border-left:2px solid #dcefe6}
+.semester-preview-summary strong{font-size:19px;color:#26352f;line-height:1}
+.semester-preview-summary span{font-size:12px;color:var(--muted)}
+.semester-preview-timeline{display:flex;flex-direction:column;gap:14px;padding:20px 0 18px}
+.semester-preview-term{display:flex;gap:11px;min-width:0}
+.semester-preview-marker{width:27px;height:27px;border-radius:9px;background:#edf3f0;color:#5f766c;display:grid;place-items:center;font-size:12px;font-weight:700;flex:0 0 auto}
+.semester-preview-term.current .semester-preview-marker{background:var(--green);color:#fff}
+.semester-preview-term-content{min-width:0;flex:1;padding-top:1px}
+.semester-preview-term-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.semester-preview-term-head strong{font-size:13px;color:#26352f}
+.semester-preview-term-head span{font-size:12px;color:var(--muted);white-space:nowrap}
+.semester-preview-bar{height:8px;margin:9px 0 8px;border-radius:99px;background:#edf2ef;overflow:hidden}
+.semester-preview-bar span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#2f8568,#8bc5a9);transition:width .2s ease}
+.semester-preview-meta{display:flex;flex-wrap:wrap;gap:10px;color:#718078;font-size:12px}
+.semester-preview-meta span{display:flex;align-items:center;gap:4px}
+.semester-preview-meta svg{width:13px;height:13px;color:#71998a}
+.semester-preview-note{display:flex;align-items:center;gap:6px;padding-top:15px;border-top:1px solid #edf0ee;color:#6f7d77;font-size:12px;line-height:1.5}
+.semester-preview-note svg{width:15px;height:15px;color:var(--green);flex:0 0 auto}
+.semester-calendar-preview{width:100%;height:100%;padding:22px;position:sticky;top:98px;box-shadow:0 8px 24px rgba(31,67,53,.04)}
+.semester-calendar-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:16px;border-bottom:1px solid #edf0ee}
+.semester-calendar-head h2{margin:6px 0 3px;font-size:20px}
+.semester-calendar-head p{margin:0;color:var(--muted);font-size:12px}
+.semester-calendar-icon{width:28px;height:28px;padding:5px;border-radius:9px;background:#e7f3ed;color:var(--green);flex:0 0 auto}
+.semester-calendar-year{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;padding:16px 0 13px}
+.semester-calendar-year span{color:var(--muted);font-size:12px}
+.semester-calendar-year strong{color:var(--green);font-size:20px;letter-spacing:.02em}
+.semester-calendar-legend{display:flex;flex-wrap:wrap;gap:7px 10px;padding:11px 0;border-top:1px solid #edf0ee;border-bottom:1px solid #edf0ee;color:#65736d;font-size:11px}
+.semester-calendar-legend span{display:flex;align-items:center;gap:4px}
+.calendar-legend-term,.calendar-legend-vacation{width:9px;height:9px;border-radius:3px;display:inline-block}
+.calendar-legend-term.term-1{background:#d9eee4}.calendar-legend-term.term-2{background:#dce8f7}.calendar-legend-term.term-3{background:#e8def8}.calendar-legend-vacation{background:#fff0d7;border:1px solid #f0d39b}
+.semester-calendar-months{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 9px;width:100%;padding:17px 0 18px}
+.semester-calendar-month{min-width:0}
+.semester-calendar-month>strong{display:block;margin-bottom:6px;color:#33423b;font-size:12px}
+.semester-calendar-weekdays,.semester-calendar-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px}
+.semester-calendar-weekdays{margin-bottom:3px;color:#a0aba5;font-size:9px;text-align:center}
+.semester-calendar-day{height:20px;display:grid;place-items:center;border-radius:5px;color:#718078;font-size:9px;line-height:1;position:relative}
+.semester-calendar-day.calendar-day-outside{visibility:hidden}
+.semester-calendar-day.calendar-day-teaching{font-weight:600}
+.semester-calendar-day.calendar-day-vacation{background:#fff0d7;color:#9b6b1b}
+.semester-calendar-day.calendar-term-1.calendar-day-teaching{background:#e2f1e9;color:#226c54}.semester-calendar-day.calendar-term-2.calendar-day-teaching{background:#e7effa;color:#416b9a}.semester-calendar-day.calendar-term-3.calendar-day-teaching{background:#eee8fb;color:#7057a1}
+.semester-calendar-day.calendar-day-start{box-shadow:inset 0 0 0 2px var(--green);font-weight:800;z-index:1}
+.semester-calendar-summary{display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid #edf0ee}
+.semester-calendar-summary div{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px}
+.semester-calendar-summary b{color:#33423b}.semester-calendar-summary span{color:var(--muted);text-align:right}
+@media(max-width:520px){.semester-year-controls{gap:8px}.semester-year-row input{width:96px}.semester-year-save{padding:0 13px}}
+@media(max-width:1000px){.dashboard-content-grid{grid-template-columns:1fr}}
+@media(max-width:1100px){.semesters-layout{grid-template-columns:1fr}.semester-calendar-preview{position:static}}
 @media(max-width:1100px){.hero{flex-direction:column;align-items:flex-start}.hero-stats{width:100%}.room-row{grid-template-columns:220px 1fr}.topbar nav{gap:14px}.user-name{display:none}.brand-copy{min-width:190px}}@media(max-width:800px){.topbar{height:62px}.topbar nav{display:none;position:absolute;top:62px;left:0;right:0;height:auto;background:#fff;padding:12px 20px;flex-direction:column;box-shadow:0 15px 30px #0001}.topbar nav.open{display:flex}.topbar nav button{padding:10px}.topbar nav button.active:after{display:none}.top-actions{margin-left:auto;border:0;padding:0}.menu-btn{display:block}.brand-copy span{display:none}.brand-copy{min-width:0}.hero{padding:38px 5vw;min-height:auto}.hero-stats>div{min-width:0;padding:5px 10px}.content-section{width:94vw;padding-top:30px}.section-heading{align-items:flex-start;gap:20px;flex-direction:column}.week-switch{width:100%;justify-content:space-between}.filters{flex-wrap:wrap}.filters label{width:100%}.legend{margin:5px 0 0;width:100%}.room-row{grid-template-columns:1fr}.room-meta{border-right:0;border-bottom:1px solid var(--line);padding:17px}.schedule{overflow-x:auto}.schedule-head,.schedule-line{min-width:650px}.hero-stats{display:none}footer{height:auto;padding:20px;gap:8px;flex-direction:column;align-items:flex-start}}@media(max-width:520px){.brand-copy strong{font-size:13px}.hero h1{font-size:36px}.hero-stats{grid-template-columns:1fr;padding:12px}.hero-stats>div{border-right:0;border-bottom:1px solid var(--line);padding:10px}.form-grid{grid-template-columns:1fr}}
 
 @media(max-width:900px){.guide-steps{grid-template-columns:1fr 1fr}.session-btn{display:none}}

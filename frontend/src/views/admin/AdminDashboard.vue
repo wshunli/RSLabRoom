@@ -5,13 +5,17 @@ import {
   Clock, DoorOpen, ListChecks, Trophy, User, Users,
 } from '@lucide/vue'
 import { api } from '../../api'
-import type { AdminStats } from '../../api'
+import type { AdminStats, Semester } from '../../api'
 import type { Room } from '../../types'
 import { periods } from '../../data'
 import StatCard from '../../components/StatCard.vue'
+import SemesterOverview from '../../components/SemesterOverview.vue'
 
 const rooms = ref<Room[]>([])
 const stats = ref<AdminStats | null>(null)
+const semesterConfig = ref<{ startYear: number; semesters: Semester[]; currentSemesterLabel: string }>({
+  startYear: new Date().getFullYear(), semesters: [], currentSemesterLabel: '',
+})
 // 今日各机房各时段占用信息，key = `${roomId}-${period}`。
 const slotInfo = ref<Map<string, { courseName: string; teacher: string; people: number; software: string }>>(new Map())
 const loading = ref(true)
@@ -144,8 +148,10 @@ async function load() {
       api.getAdminRooms().catch(() => [] as Room[]),
       api.getStats(),
     ])
+    const semesterData = await api.getSemesters().catch(() => null)
     rooms.value = roomList
     stats.value = data
+    if (semesterData) semesterConfig.value = semesterData
     const map = new Map<string, { courseName: string; teacher: string; people: number; software: string }>()
     for (const t of data.todayList) {
       map.set(`${t.roomId}-${t.period}`, {
@@ -208,7 +214,14 @@ onUnmounted(() => timer && clearInterval(timer))
 
     <p v-if="error" class="dashboard-error">{{ error }}</p>
 
-    <section class="panel">
+    <div class="dashboard-content-grid">
+      <SemesterOverview
+        :start-year="semesterConfig.startYear"
+        :semesters="semesterConfig.semesters"
+        :current-semester-label="semesterConfig.currentSemesterLabel"
+      />
+
+      <section class="panel dashboard-today-panel">
       <div class="panel-head">
         <div>
           <h2>今日机房占用</h2>
@@ -281,6 +294,7 @@ onUnmounted(() => timer && clearInterval(timer))
           </div>
         </div>
       </div>
-    </section>
+      </section>
+    </div>
   </section>
 </template>

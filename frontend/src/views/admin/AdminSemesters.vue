@@ -2,6 +2,7 @@
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { CalendarDays, CalendarRange, Check, Clock3, GraduationCap, Save } from '@lucide/vue'
 import { api, type Semester } from '../../api'
+import SemesterCalendar from '../../components/SemesterCalendar.vue'
 
 type EditableSemester = Pick<Semester, 'term' | 'startDate' | 'weeks' | 'extraWeeks'>
 
@@ -105,17 +106,19 @@ onMounted(async () => {
       <div class="semesters-side">
         <form class="panel semesters-form" @submit.prevent="save('year')">
           <div class="panel-head"><div><h2><GraduationCap />选择学年</h2><p>切换学年后，各学期日期会同步调整年份。</p></div></div>
-          <label class="semester-year-row">
-            <span>起始年份</span>
-            <span class="setting-suffix">
-              <input v-model.number="startYear" type="number" min="2000" max="2100" required>
-              <span>至 {{ Number.isInteger(startYear) ? startYear + 1 : '' }} 年</span>
+          <div class="semester-year-row">
+            <label class="semester-year-label" for="semesterStartYear">起始年份</label>
+            <span class="semester-year-controls">
+              <span class="setting-suffix">
+                <input id="semesterStartYear" v-model.number="startYear" type="number" min="2000" max="2100" required>
+                <span>至 {{ Number.isInteger(startYear) ? startYear + 1 : '' }} 年</span>
+              </span>
+              <button class="primary semester-year-save" type="submit"><Save />保存</button>
             </span>
-          </label>
+          </div>
           <div class="settings-footer">
             <span v-if="feedback && feedback.target === 'year' && !feedback.ok" class="semester-error">{{ feedback.text }}</span>
             <span v-else-if="feedback && feedback.target === 'year'" class="settings-saved"><Check />{{ feedback.text }}</span>
-            <button class="primary" type="submit"><Save />保存学年</button>
           </div>
         </form>
 
@@ -137,8 +140,8 @@ onMounted(async () => {
                 <span class="setting-suffix"><input v-model.number="semester.weeks" type="number" min="1" max="30" required :aria-label="`${TERM_NAMES[semester.term - 1]}教学周数`"><span>周</span></span>
               </label>
               <label class="semester-field">
-                <span><CalendarRange />{{ semester.term === 1 ? '寒假延长' : '暑假延长' }}</span>
-                <span class="setting-suffix"><input v-model.number="semester.extraWeeks" type="number" min="0" max="30" required :aria-label="`${TERM_NAMES[semester.term - 1]}${semester.term === 1 ? '寒假' : '暑假'}延长周数`"><span>周</span></span>
+                <span><CalendarRange />{{ semester.term === 1 ? '寒假周数' : '暑假延长' }}</span>
+                <span class="setting-suffix"><input v-model.number="semester.extraWeeks" type="number" min="0" max="30" required :aria-label="`${TERM_NAMES[semester.term - 1]}${semester.term === 1 ? '寒假周数' : '暑假延长周数'}`"><span>周</span></span>
               </label>
             </div>
           </div>
@@ -150,6 +153,8 @@ onMounted(async () => {
           </div>
         </form>
       </div>
+
+      <SemesterCalendar :start-year="startYear" :semesters="terms" />
 
     </div>
   </section>
