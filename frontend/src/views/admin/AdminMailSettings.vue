@@ -7,7 +7,7 @@ const settings = ref({
   startYear: new Date().getFullYear(), startMonth: 1, startDay: 1 as number | null,
   semesterWeeks: 1, contactName: '', contactPhone: '',
   smtpEnabled: false, smtpHost: '', smtpPort: 465, smtpSecure: true,
-  smtpUser: '', smtpPassword: '', smtpPasswordSet: false, smtpFrom: '', adminEmail: '',
+  smtpUser: '', smtpPassword: '', smtpPasswordSet: false, smtpFrom: '', adminEmail: '', siteUrl: '',
 })
 const saved = ref(false)
 const testing = ref(false)
@@ -51,6 +51,7 @@ onMounted(async () => {
       <div class="setting-row"><label for="smtpPassword">SMTP 密码/授权码</label><div><input id="smtpPassword" v-model="settings.smtpPassword" class="setting-full-input" type="password" autocomplete="new-password" :placeholder="settings.smtpPasswordSet ? '已设置，留空则不修改' : '请输入密码或授权码'"><small class="setting-help">后台不会回显已保存的密码。</small></div></div>
       <div class="setting-row"><label for="smtpFrom">发件人</label><input id="smtpFrom" v-model.trim="settings.smtpFrom" type="text" placeholder="机房预约系统 &lt;notice@example.com&gt;"></div>
       <div class="setting-row"><label for="adminEmail">管理员邮箱</label><input id="adminEmail" v-model.trim="settings.adminEmail" type="email" placeholder="admin@example.com" :required="settings.smtpEnabled"></div>
+      <div class="setting-row"><label for="siteUrl">系统访问地址</label><div><input id="siteUrl" v-model.trim="settings.siteUrl" class="setting-full-input" type="url" placeholder="https://room.example.com" :required="settings.smtpEnabled"><small class="setting-help">用于生成邮件中的安全审批链接，请填写外部可访问的完整地址。</small></div></div>
       <div class="settings-footer">
         <span v-if="saved" class="settings-saved"><Check />设置已保存</span>
         <button class="secondary settings-test" type="button" :disabled="testing" @click="test"><Send />{{ testing ? '发送中…' : '保存并发送测试邮件' }}</button>

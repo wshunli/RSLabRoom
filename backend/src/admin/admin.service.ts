@@ -3,6 +3,8 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { DatabaseService } from '../database/database.service'
 import { MailService } from '../mail/mail.service'
+import { JwtService } from '@nestjs/jwt'
+import { UnauthorizedException } from '@nestjs/common'
 import { rowToRoom } from '../shared/rooms'
 import { formatDate, parseDate, PERIOD_HOURS, PERIOD_NAMES, periodToTag, slotDate } from '../shared/time'
 import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
@@ -23,7 +25,7 @@ function userResponse(row: RowDataPacket) {
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly database: DatabaseService, private readonly mail: MailService) {}
+  constructor(private readonly database: DatabaseService, private readonly mail: MailService, private readonly jwt: JwtService) {}
 
   private async loadConsole(): Promise<Record<string, string>> {
     const rows = await this.database.query<RowDataPacket[]>('SELECT name, value FROM console')
@@ -251,6 +253,7 @@ export class AdminService {
       smtpPasswordSet: Boolean(config.smtp_password),
       smtpFrom: config.smtp_from || '',
       adminEmail: config.admin_email || '',
+      siteUrl: config.site_url || '',
     }
   }
 
@@ -271,6 +274,7 @@ export class AdminService {
       ['smtp_user', body.smtpUser.trim()],
       ['smtp_from', body.smtpFrom.trim()],
       ['admin_email', body.adminEmail.trim()],
+      ['site_url', body.siteUrl.trim().replace(/\/$/, '')],
     ]
     if (body.smtpPassword) values.push(['smtp_password', body.smtpPassword])
     await this.database.transaction(async (connection) => {
@@ -289,6 +293,30 @@ export class AdminService {
     } catch (error) {
       throw new BadRequestException({ error: error instanceof Error ? error.message : '测试邮件发送失败' })
     }
+  }
+
+  async getMailApproval(token: string) {
+    const id = await this.mailApprovalId(token)
+    const row = await this.database.queryOne<RowDataPacket>(
+      'SELECT stimeid, sperson, sphone, snumer, sname, smore, sstatus FROM submit WHERE stimeid = ?', [id],
+    )
+    if (!row) throw new NotFoundException({ error: '申请不存在' })
+    return { id, applicant: row.sperson, phone: row.sphone, people: Number(row.snumer) || 0,
+      courseName: row.sname, remarks: row.smore, state: STATE_BY_CODE[Number(row.sstatus)] || 'pending',
+      detailList: await this.buildDetails(id) }
+  }
+
+  async approveByMail(token: string) {
+    const id = await this.mailApprovalId(token)
+    return this.approve(id)
+  }
+
+  private async mailApprovalId(token: string) {
+    try {
+      const payload = await this.jwt.verifyAsync<{ sub: string; purpose: string }>(token)
+      if (payload.purpose !== 'mail-approval' || !payload.sub) throw new Error('invalid scope')
+      return payload.sub
+    } catch { throw new UnauthorizedException({ error: '审批链接无效或已过期' }) }
   }
 
   async getUsers() {

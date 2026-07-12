@@ -4,6 +4,7 @@ import { RowDataPacket } from 'mysql2'
 import { DatabaseService } from '../database/database.service'
 import { CreateApplicationDto } from '../public/public.dto'
 import { PERIOD_NAMES } from '../shared/time'
+import { JwtService } from '@nestjs/jwt'
 
 function escapeHtml(value: unknown) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -15,11 +16,11 @@ function escapeHtml(value: unknown) {
 export class MailService {
   private readonly logger = new Logger(MailService.name)
 
-  constructor(private readonly database: DatabaseService) {}
+  constructor(private readonly database: DatabaseService, private readonly jwt: JwtService) {}
 
   private async config() {
     const rows = await this.database.query<RowDataPacket[]>(
-      "SELECT name, value FROM console WHERE name LIKE 'smtp_%' OR name = 'admin_email'",
+      "SELECT name, value FROM console WHERE name LIKE 'smtp_%' OR name IN ('admin_email', 'site_url')",
     )
     return Object.fromEntries(rows.map((row) => [String(row.name), String(row.value || '')]))
   }
@@ -48,13 +49,23 @@ export class MailService {
         to: config.admin_email,
         subject: `【机房预约】${body.applicantName} 提交了新的借用申请`,
         text: `申请编号：${id}\n申请人：${body.applicantName}\n联系电话：${body.phone}\n课程/用途：${body.courseName}\n人数：${body.attendees}\n软件需求：${body.requiredSoftware || '无'}\n备注：${body.remarks || '无'}\n预约日期：${dates.join('、')}`,
-        html: `<h2>新的机房借用申请</h2><p>申请编号：${escapeHtml(id)}</p><p>申请人：${escapeHtml(body.applicantName)}（${escapeHtml(body.phone)}）</p><p>课程/用途：${escapeHtml(body.courseName)}</p><p>人数：${escapeHtml(body.attendees)}</p><p>软件需求：${escapeHtml(body.requiredSoftware || '无')}</p><p>备注：${escapeHtml(body.remarks || '无')}</p><ul>${slotRows}</ul><p>请登录管理后台处理。</p>`,
+        html: await this.applicationHtml(config, id, body, slotRows),
       })
       return true
     } catch (error) {
       this.logger.error(`申请 ${id} 的管理员通知邮件发送失败`, error instanceof Error ? error.stack : String(error))
       return false
     }
+  }
+
+  private async applicationHtml(config: Record<string, string>, id: string, body: CreateApplicationDto, slotRows: string) {
+    const token = await this.jwt.signAsync({ sub: id, purpose: 'mail-approval' }, { expiresIn: '7d' })
+    const baseUrl = config.site_url.replace(/\/$/, '')
+    const approval = baseUrl ? `${baseUrl}/mail-approval/${encodeURIComponent(token)}` : ''
+    const button = approval
+      ? `<p style="margin:24px 0"><a href="${escapeHtml(approval)}" style="display:inline-block;padding:11px 20px;background:#24705a;color:#fff;text-decoration:none;border-radius:7px">查看申请并确认通过</a></p><p style="color:#77827d;font-size:12px">审批链接 7 天内有效，请勿转发。</p>`
+      : '<p>请登录管理后台处理。</p>'
+    return `<h2>新的机房借用申请</h2><p>申请编号：${escapeHtml(id)}</p><p>申请人：${escapeHtml(body.applicantName)}（${escapeHtml(body.phone)}）</p><p>课程/用途：${escapeHtml(body.courseName)}</p><p>人数：${escapeHtml(body.attendees)}</p><p>软件需求：${escapeHtml(body.requiredSoftware || '无')}</p><p>备注：${escapeHtml(body.remarks || '无')}</p><ul>${slotRows}</ul>${button}`
   }
 
   async sendTestEmail() {

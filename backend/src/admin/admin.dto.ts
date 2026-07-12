@@ -67,6 +67,9 @@ export class UpdateSettingsDto {
 
   @ValidateIf((o) => o.adminEmail !== '') @IsEmail() @MaxLength(255)
   adminEmail = ''
+
+  @IsString() @MaxLength(500)
+  siteUrl = ''
 }
 
 export class CreateScheduleDto {

@@ -10,6 +10,7 @@ import AdminRooms from '../views/admin/AdminRooms.vue'
 import AdminUsers from '../views/admin/AdminUsers.vue'
 import AdminSettings from '../views/admin/AdminSettings.vue'
 import AdminMailSettings from '../views/admin/AdminMailSettings.vue'
+import MailApproval from '../views/MailApproval.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -28,6 +29,11 @@ const router = createRouter({
       path: '/guide',
       name: 'guide',
       component: GuidePortal,
+    },
+    {
+      path: '/mail-approval/:token',
+      name: 'mail-approval',
+      component: MailApproval,
     },
     {
       path: '/admin',

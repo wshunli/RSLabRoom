@@ -11,7 +11,7 @@ const systemSettings = ref({
   contactName: '',
   contactPhone: '',
   smtpEnabled: false, smtpHost: '', smtpPort: 465, smtpSecure: true,
-  smtpUser: '', smtpPassword: '', smtpPasswordSet: false, smtpFrom: '', adminEmail: '',
+  smtpUser: '', smtpPassword: '', smtpPasswordSet: false, smtpFrom: '', adminEmail: '', siteUrl: '',
 })
 const settingsSaved = ref(false)
 
