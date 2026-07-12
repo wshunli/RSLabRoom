@@ -29,6 +29,7 @@ const busySlots = ref<Set<string>>(new Set())
 const slotInfo = ref<Map<string, { courseName: string; teacher: string; phone: string; date: string }>>(new Map())
 const week = ref(1)
 const totalWeeks = ref(0)
+const semesterName = ref('')
 const currentTeachingWeek = ref(0)
 const weekPickerOpen = ref(false)
 const rangeStart = ref('')
@@ -103,6 +104,7 @@ onMounted(async () => {
   try {
     const [config, rooms] = await Promise.all([api.getConfig(), api.getRooms()])
     totalWeeks.value = config.totalWeeks
+    semesterName.value = config.semesterLabel
     currentTeachingWeek.value = config.currentWeek
     roomList.value = rooms
     await loadAvailability(config.currentWeek)
@@ -203,7 +205,7 @@ function finishBooking() {
 
     <section class="content-section">
       <div class="section-heading">
-        <div><span class="kicker">ROOM AVAILABILITY</span><h2>本周机房安排</h2><p>点击空闲时段即可发起预约申请</p></div>
+        <div><span class="kicker">ROOM AVAILABILITY</span><h2>本周机房安排</h2><p>{{ semesterName ? `${semesterName} · ` : '' }}点击空闲时段即可发起预约申请</p></div>
         <div class="week-switch">
           <button aria-label="上一周" @click="changeWeek(-1)"><ChevronLeft :size="17" /></button>
           <button

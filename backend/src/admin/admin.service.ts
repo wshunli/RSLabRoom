@@ -7,7 +7,8 @@ import { JwtService } from '@nestjs/jwt'
 import { UnauthorizedException } from '@nestjs/common'
 import { rowToRoom } from '../shared/rooms'
 import { formatDate, parseDate, PERIOD_HOURS, PERIOD_NAMES, periodToTag, slotDate } from '../shared/time'
-import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
+import { currentSemester, Semester, semesterLabel, semestersFromConfig, sortSemesters } from '../shared/semesters'
+import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateSemestersDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
 
 const STATE_BY_CODE: Record<number, string> = { 0: 'pending', 1: 'approved', 2: 'rejected' }
 const SCHEDULING_LOCK = 'rslabroom:scheduling'
@@ -234,14 +235,47 @@ export class AdminService {
     return { id, deleted: true }
   }
 
+  async getSemesters() {
+    const config = await this.loadConsole()
+    const semesters = semestersFromConfig(config)
+    const active = currentSemester(semesters)
+    // 学年直接读取已保存配置；首次配置时仅提供当前年份作为表单初始值。
+    const startYear = sortSemesters(semesters)[0]?.startYear ?? new Date().getFullYear()
+    return { startYear, semesters, currentSemesterLabel: active ? semesterLabel(active) : '' }
+  }
+
+  async updateSemesters(body: UpdateSemestersDto) {
+    const rangeStart = `${body.startYear}-08-01`
+    const rangeEnd = `${body.startYear + 1}-07-31`
+    const seen = new Set<number>()
+    const semesters: Semester[] = body.semesters.map((item) => {
+      const date = parseDate(item.startDate)
+      if (formatDate(date) !== item.startDate) {
+        throw new BadRequestException({ error: `第${item.term}学期的开学日期无效` })
+      }
+      if (item.startDate < rangeStart || item.startDate > rangeEnd) {
+        throw new BadRequestException({
+          error: `第${item.term}学期的开学日期不在 ${body.startYear}-${body.startYear + 1} 学年内（${body.startYear} 年 8 月 — ${body.startYear + 1} 年 7 月）`,
+        })
+      }
+      if (seen.has(item.term)) throw new BadRequestException({ error: `第${item.term}学期配置重复` })
+      seen.add(item.term)
+      return { startYear: body.startYear, term: item.term, startDate: item.startDate, weeks: item.weeks }
+    })
+    const sorted = sortSemesters(semesters)
+    // begtime/week 保留为「当前学期」的快照，兼容仍直接读取这两个键的旧版预约大厅页面。
+    const active = currentSemester(sorted) || sorted[0]
+    await this.saveConsole([
+      ['semesters', JSON.stringify(sorted)],
+      ['begtime', active.startDate],
+      ['week', String(active.weeks)],
+    ])
+    return this.getSemesters()
+  }
+
   async getSettings() {
     const config = await this.loadConsole()
-    const start = parseDate(config.begtime || formatDate(new Date()))
     return {
-      startYear: start.getFullYear(),
-      startMonth: start.getMonth() + 1,
-      startDay: start.getDate(),
-      semesterWeeks: Number(config.week || 0),
       contactName: config.lianxiren || '',
       contactPhone: config.lianxidianhua || '',
       smtpEnabled: config.smtp_enabled === 'true',
@@ -257,14 +291,18 @@ export class AdminService {
     }
   }
 
+  private async saveConsole(values: Array<[string, string]>) {
+    await this.database.transaction(async (connection) => {
+      for (const [name, value] of values) {
+        const [existing] = await connection.execute<RowDataPacket[]>('SELECT name FROM console WHERE name = ?', [name])
+        if (existing.length) await connection.execute('UPDATE console SET value = ? WHERE name = ?', [value, name])
+        else await connection.execute('INSERT INTO console (name, value) VALUES (?, ?)', [name, value])
+      }
+    })
+  }
+
   async updateSettings(body: UpdateSettingsDto) {
-    const date = new Date(body.startYear, body.startMonth - 1, body.startDay)
-    if (date.getFullYear() !== body.startYear || date.getMonth() !== body.startMonth - 1 || date.getDate() !== body.startDay) {
-      throw new BadRequestException({ error: '开学日期无效' })
-    }
     const values: Array<[string, string]> = [
-      ['begtime', `${body.startYear}-${body.startMonth}-${body.startDay}`],
-      ['week', String(body.semesterWeeks)],
       ['lianxiren', body.contactName],
       ['lianxidianhua', body.contactPhone],
       ['smtp_enabled', String(body.smtpEnabled)],
@@ -277,13 +315,7 @@ export class AdminService {
       ['site_url', body.siteUrl.trim().replace(/\/$/, '')],
     ]
     if (body.smtpPassword) values.push(['smtp_password', body.smtpPassword])
-    await this.database.transaction(async (connection) => {
-      for (const [name, value] of values) {
-        const [existing] = await connection.execute<RowDataPacket[]>('SELECT name FROM console WHERE name = ?', [name])
-        if (existing.length) await connection.execute('UPDATE console SET value = ? WHERE name = ?', [value, name])
-        else await connection.execute('INSERT INTO console (name, value) VALUES (?, ?)', [name, value])
-      }
-    })
+    await this.saveConsole(values)
     return { ok: true }
   }
 
@@ -406,7 +438,8 @@ export class AdminService {
   // 直接进入「预约审批」流程，与首页预约提交一致。
   async createSchedule(body: CreateScheduleDto) {
     const config = await this.loadConsole()
-    const semesterStart = config.begtime || formatDate(new Date())
+    const active = currentSemester(semestersFromConfig(config))
+    const semesterStart = active?.startDate || formatDate(new Date())
     const dates = body.mode === 'daily'
       ? this.dailyDates(body, semesterStart)
       : this.weeklyDates(body, semesterStart)

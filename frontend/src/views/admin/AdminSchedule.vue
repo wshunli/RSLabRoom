@@ -8,6 +8,7 @@ import SchedulePreview from '../../components/SchedulePreview.vue'
 import WeekSelect from '../../components/WeekSelect.vue'
 
 const semesterWeeks = ref(18)
+const semesterName = ref('')
 const currentTeachingWeek = ref(0)
 
 // 排期方式标签页：按周重复 / 按天重复
@@ -163,14 +164,15 @@ function addDailyRule() {
 
 onMounted(async () => {
   try {
-    const [s, config] = await Promise.all([api.getSettings(), api.getConfig()])
-    semesterWeeks.value = s.semesterWeeks
+    const config = await api.getConfig()
+    semesterWeeks.value = config.totalWeeks || 1
+    semesterName.value = config.semesterLabel
     currentTeachingWeek.value = config.currentWeek
     // 以当前教学周为起点，限制在 [1, 学期周数] 之间
-    const current = Math.min(Math.max(config.currentWeek || 1, 1), s.semesterWeeks)
+    const current = Math.min(Math.max(config.currentWeek || 1, 1), semesterWeeks.value)
     // 按周重复：开始周为当前周，向后最多 12 周（含当前周），不超过学期周数
     weeklyForm.startWeek = current
-    weeklyForm.endWeek = Math.min(current + 11, s.semesterWeeks)
+    weeklyForm.endWeek = Math.min(current + 11, semesterWeeks.value)
     // 按天重复：开始周与结束周均为当前周
     dailyForm.startWeek = current
     dailyForm.endWeek = current
@@ -182,7 +184,7 @@ onMounted(async () => {
   <section class="admin-main schedule-management-page">
     <div class="admin-title">
       <div><span class="kicker">BATCH RESERVATION</span><h1>批量预约（排期）</h1><p>一次生成多条预约，统一进入「预约审批」流程；冲突时段自动跳过。</p></div>
-      <span class="date-card"><CalendarDays /><b>当前学期</b><small>共 {{ semesterWeeks }} 周</small></span>
+      <span class="date-card"><CalendarDays /><b>{{ semesterName || '当前学期' }}</b><small>共 {{ semesterWeeks }} 周</small></span>
     </div>
 
     <section class="panel schedule-common-panel">

@@ -4,8 +4,7 @@ import { Check, Mail, Save, Send } from '@lucide/vue'
 import { api } from '../../api'
 
 const settings = ref({
-  startYear: new Date().getFullYear(), startMonth: 1, startDay: 1 as number | null,
-  semesterWeeks: 1, contactName: '', contactPhone: '',
+  contactName: '', contactPhone: '',
   smtpEnabled: false, smtpHost: '', smtpPort: 465, smtpSecure: true,
   smtpUser: '', smtpPassword: '', smtpPasswordSet: false, smtpFrom: '', adminEmail: '', siteUrl: '',
 })
@@ -30,7 +29,7 @@ async function test() {
 }
 
 onMounted(async () => {
-  try { const value = await api.getSettings(); settings.value = { ...value, startDay: value.startDay } }
+  try { const value = await api.getSettings(); settings.value = { ...settings.value, ...value } }
   catch { /* 由保存操作显示具体错误 */ }
 })
 </script>

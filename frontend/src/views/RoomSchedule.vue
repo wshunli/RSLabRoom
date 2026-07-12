@@ -21,6 +21,7 @@ const loading = ref(true)
 const error = ref('')
 const room = ref<Room | null>(null)
 const totalWeeks = ref(0)
+const semesterName = ref('')
 
 interface WeekSchedule {
   week: number
@@ -220,6 +221,7 @@ async function init() {
       return
     }
     totalWeeks.value = Math.max(config.totalWeeks, 1)
+    semesterName.value = config.semesterLabel
     await loadMore()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载失败'
@@ -259,7 +261,7 @@ watch(roomId, init)
         <div class="section-heading">
           <div>
             <span class="kicker">ROOM SCHEDULE</span>
-            <h2>{{ room.name }} · 本学期预约情况</h2>
+            <h2>{{ room.name }} · {{ semesterName || '本学期' }}预约情况</h2>
             <p>
               <MapPin :size="13" />{{ room.building }}
               <span class="dot">·</span><Users :size="13" />{{ room.seats }} 座

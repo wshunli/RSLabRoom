@@ -5,6 +5,7 @@ import { DatabaseService } from '../database/database.service'
 import { MailService } from '../mail/mail.service'
 import { rowToRoom } from '../shared/rooms'
 import { currentWeek, dayIndexOf, formatDate, periodToTag, slotDate, weekRange } from '../shared/time'
+import { currentSemester, Semester, semesterLabel, semestersFromConfig } from '../shared/semesters'
 import { CreateApplicationDto } from './public.dto'
 
 interface ConsoleRow extends RowDataPacket { name: string; value: string }
@@ -18,15 +19,22 @@ export class PublicService {
     return Object.fromEntries(rows.map((row) => [row.name, row.value]))
   }
 
-  async getConfig() {
+  // 当前学期：按今天日期从学年学期配置中自动选取。
+  private async activeSemester(): Promise<{ config: Record<string, string>; semester: Semester | null }> {
     const config = await this.loadConsole()
-    const semesterStart = config.begtime || formatDate(new Date())
-    const totalWeeks = Number(config.week || 0)
+    return { config, semester: currentSemester(semestersFromConfig(config)) }
+  }
+
+  async getConfig() {
+    const { config, semester } = await this.activeSemester()
+    const semesterStart = semester?.startDate || formatDate(new Date())
+    const totalWeeks = semester?.weeks || 0
     const week = currentWeek(semesterStart)
     return {
       semesterStart,
       totalWeeks,
       currentWeek: Math.min(Math.max(week, 1), totalWeeks || week),
+      semesterLabel: semester ? semesterLabel(semester) : '',
       contact: { name: config.lianxiren || '', phone: config.lianxidianhua || '' },
     }
   }
@@ -39,9 +47,9 @@ export class PublicService {
   }
 
   async getAvailability(requestedWeek?: number) {
-    const config = await this.loadConsole()
-    const semesterStart = config.begtime || formatDate(new Date())
-    const totalWeeks = Number(config.week || 0)
+    const { semester } = await this.activeSemester()
+    const semesterStart = semester?.startDate || formatDate(new Date())
+    const totalWeeks = semester?.weeks || 0
     const week = requestedWeek || currentWeek(semesterStart)
     const range = weekRange(semesterStart, week)
     const rows = await this.database.query<RowDataPacket[]>(
@@ -68,8 +76,8 @@ export class PublicService {
   }
 
   async createApplication(body: CreateApplicationDto) {
-    const config = await this.loadConsole()
-    const semesterStart = config.begtime || formatDate(new Date())
+    const { semester } = await this.activeSemester()
+    const semesterStart = semester?.startDate || formatDate(new Date())
     const groupId = `${Date.now()}${randomUUID().replaceAll('-', '').slice(0, 8)}`
     const dates: string[] = []
 

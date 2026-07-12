@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer'
-import { IsBoolean, IsEmail, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator'
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEmail, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested } from 'class-validator'
 
 export class ApplicationQueryDto {
   @IsOptional() @IsIn(['pending', 'approved', 'rejected', 'all'])
@@ -21,19 +21,29 @@ export class ApplicationQueryDto {
   pageSize = 15
 }
 
-export class UpdateSettingsDto {
+// 学期配置：一个学年固定包含第一、二、三学期，每学期只需填开学日期与周数。
+export class SemesterDto {
+  @Type(() => Number) @IsInt() @Min(1) @Max(3)
+  term: number
+
+  @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: '开学日期格式应为 YYYY-MM-DD' })
+  startDate: string
+
+  @Type(() => Number) @IsInt() @Min(1) @Max(60)
+  weeks: number
+}
+
+export class UpdateSemestersDto {
+  // 学年起始年份：2025 表示 2025-2026 学年
   @Type(() => Number) @IsInt() @Min(2000) @Max(2100)
   startYear: number
 
-  @Type(() => Number) @IsInt() @Min(1) @Max(12)
-  startMonth: number
+  @IsArray() @ArrayMinSize(3, { message: '需要完整配置第一、二、三学期' }) @ArrayMaxSize(3, { message: '一个学年固定为三个学期' })
+  @ValidateNested({ each: true }) @Type(() => SemesterDto)
+  semesters: SemesterDto[]
+}
 
-  @Type(() => Number) @IsInt() @Min(1) @Max(31)
-  startDay: number
-
-  @Type(() => Number) @IsInt() @Min(1) @Max(60)
-  semesterWeeks: number
-
+export class UpdateSettingsDto {
   @IsString() @MaxLength(100)
   contactName: string
 

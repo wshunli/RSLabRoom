@@ -40,10 +40,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 // ---- 公共数据 ---------------------------------------------------------------
 
+// 学期配置：学年、学期序号、开学日期和周数均以后端保存值为准。
+export interface Semester {
+  startYear: number
+  term: number
+  startDate: string
+  weeks: number
+}
+
 export interface SiteConfig {
   semesterStart: string
   totalWeeks: number
   currentWeek: number
+  semesterLabel: string
   contact: { name: string; phone: string }
 }
 
@@ -157,12 +166,18 @@ export const api = {
   deleteApplication: (id: string) =>
     request<{ id: string; deleted: boolean }>(`/admin/applications/${id}`, { method: 'DELETE' }),
 
+  // ---- 学期设置（一个学年固定三个学期） ---------------------------------------
+  getSemesters: () =>
+    request<{ startYear: number; semesters: Semester[]; currentSemesterLabel: string }>('/admin/semesters'),
+
+  updateSemesters: (startYear: number, semesters: Array<Pick<Semester, 'term' | 'startDate' | 'weeks'>>) =>
+    request<{ startYear: number; semesters: Semester[]; currentSemesterLabel: string }>('/admin/semesters', {
+      method: 'PUT',
+      body: JSON.stringify({ startYear, semesters: semesters.map(({ term, startDate, weeks }) => ({ term, startDate, weeks })) }),
+    }),
+
   // ---- 系统设置 -------------------------------------------------------------
   getSettings: () => request<{
-    startYear: number
-    startMonth: number
-    startDay: number
-    semesterWeeks: number
     contactName: string
     contactPhone: string
     smtpEnabled: boolean
@@ -178,10 +193,6 @@ export const api = {
   }>('/admin/settings'),
 
   updateSettings: (payload: {
-    startYear: number
-    startMonth: number
-    startDay: number | null
-    semesterWeeks: number
     contactName: string
     contactPhone: string
     smtpEnabled: boolean
@@ -197,8 +208,7 @@ export const api = {
     // GET 响应中包含 smtpPasswordSet 这类只读状态；保存时只发送 DTO 接受的字段，
     // 避免 NestJS 的严格白名单把响应辅助字段判定为非法属性。
     const body = {
-      startYear: payload.startYear, startMonth: payload.startMonth, startDay: payload.startDay,
-      semesterWeeks: payload.semesterWeeks, contactName: payload.contactName, contactPhone: payload.contactPhone,
+      contactName: payload.contactName, contactPhone: payload.contactPhone,
       smtpEnabled: payload.smtpEnabled, smtpHost: payload.smtpHost, smtpPort: payload.smtpPort,
       smtpSecure: payload.smtpSecure, smtpUser: payload.smtpUser, smtpPassword: payload.smtpPassword,
       smtpFrom: payload.smtpFrom, adminEmail: payload.adminEmail, siteUrl: payload.siteUrl,

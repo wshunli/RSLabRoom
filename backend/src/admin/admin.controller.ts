@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '../auth/auth.guard'
 import { AdminService } from './admin.service'
-import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
+import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateSemestersDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
 
 @Controller('api/admin')
 @UseGuards(AuthGuard)
@@ -22,6 +22,12 @@ export class AdminController {
 
   @Delete('applications/:id')
   deleteApplication(@Param('id') id: string) { return this.service.deleteApplication(id) }
+
+  @Get('semesters')
+  getSemesters() { return this.service.getSemesters() }
+
+  @Put('semesters')
+  updateSemesters(@Body() body: UpdateSemestersDto) { return this.service.updateSemesters(body) }
 
   @Get('settings')
   getSettings() { return this.service.getSettings() }

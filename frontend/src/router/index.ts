@@ -8,6 +8,7 @@ import AdminApproval from '../views/admin/AdminApproval.vue'
 import AdminSchedule from '../views/admin/AdminSchedule.vue'
 import AdminRooms from '../views/admin/AdminRooms.vue'
 import AdminUsers from '../views/admin/AdminUsers.vue'
+import AdminSemesters from '../views/admin/AdminSemesters.vue'
 import AdminSettings from '../views/admin/AdminSettings.vue'
 import AdminMailSettings from '../views/admin/AdminMailSettings.vue'
 import MailApproval from '../views/MailApproval.vue'
@@ -65,6 +66,11 @@ const router = createRouter({
           path: 'users',
           name: 'admin-users',
           component: AdminUsers,
+        },
+        {
+          path: 'semesters',
+          name: 'admin-semesters',
+          component: AdminSemesters,
         },
         {
           path: 'mail-settings',
