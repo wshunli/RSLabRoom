@@ -16,6 +16,11 @@ const route = useRoute()
 const router = useRouter()
 
 const roomId = computed(() => Number(route.params.id))
+const semesterTerm = computed<number | undefined>(() => {
+  const raw = Array.isArray(route.query.term) ? route.query.term[0] : route.query.term
+  const term = Number(raw)
+  return [1, 2, 3].includes(term) ? term : undefined
+})
 
 const loading = ref(true)
 const error = ref('')
@@ -173,7 +178,7 @@ async function handleSubmit(form: BookingForm) {
     period: s.period,
   }))
   try {
-    const res = await api.submitApplication({ ...form, slots })
+    const res = await api.submitApplication({ ...form, semesterTerm: semesterTerm.value, slots })
     lastAppId.value = res.id
     submitted.value = true
   } catch (err) {
@@ -195,8 +200,12 @@ async function loadMore() {
     const start = nextWeek.value
     const end = Math.min(start + PAGE_SIZE - 1, totalWeeks.value)
     const responses = await Promise.all(
-      Array.from({ length: end - start + 1 }, (_, i) => api.getAvailability(start + i)),
+      Array.from({ length: end - start + 1 }, (_, i) => api.getAvailability(start + i, semesterTerm.value)),
     )
+    if (responses[0]) {
+      totalWeeks.value = responses[0].totalWeeks
+      semesterName.value = responses[0].semesterLabel
+    }
     loadedWeeks.value.push(...responses.map(mapWeek))
     nextWeek.value = end + 1
   } catch (err) {
@@ -225,8 +234,15 @@ async function init() {
       error.value = '未找到该机房'
       return
     }
-    totalWeeks.value = Math.max(config.totalWeeks, 1)
-    semesterName.value = config.semesterLabel
+    const targetSemester = config.semesters.find((item) => item.term === semesterTerm.value)
+      ?? config.semesters.find((item) => item.term === config.currentTerm)
+    totalWeeks.value = Math.max(
+      targetSemester ? targetSemester.weeks + targetSemester.extraWeeks : config.totalWeeks,
+      1,
+    )
+    semesterName.value = targetSemester
+      ? `${targetSemester.startYear}-${targetSemester.startYear + 1}学年第${targetSemester.term}学期`
+      : config.semesterLabel
     await loadMore()
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载失败'
@@ -251,7 +267,7 @@ watch(sentinel, (el, prev) => {
   if (el) observer?.observe(el)
 })
 
-watch(roomId, init)
+watch([roomId, semesterTerm], init)
 </script>
 
 <template>

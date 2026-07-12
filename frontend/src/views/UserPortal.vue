@@ -302,6 +302,7 @@ function finishBooking() {
             v-for="room in filteredRooms"
             :key="room.id"
             :room="room"
+            :semester-term="selectedTerm"
             :selected="selected"
             :busy-slots="busySlots"
             :slot-info="slotInfo"

@@ -6,6 +6,7 @@ import type { Room, SelectedSlot } from '../types'
 
 const props = defineProps<{
   room: Room
+  semesterTerm: number | null
   selected: SelectedSlot[]
   busySlots: Set<string>
   slotInfo: Map<string, { courseName: string; teacher?: string; date?: string }>
@@ -36,11 +37,18 @@ function onClick(day: number, period: number) {
 function isSelected(day: number, period: number) {
   return props.selected.some((slot) => slot.room.id === props.room.id && slot.day === day && slot.period === period)
 }
+
+function roomScheduleLink() {
+  return {
+    path: `/room/${props.room.id}`,
+    query: props.semesterTerm ? { term: String(props.semesterTerm) } : undefined,
+  }
+}
 </script>
 
 <template>
   <article class="room-row">
-    <RouterLink class="room-meta" :to="`/room/${room.id}`" title="查看本学期完整预约情况">
+    <RouterLink class="room-meta" :to="roomScheduleLink()" title="查看所选学期完整预约情况">
       <div class="room-number">{{ String(room.id).padStart(2, '0') }}</div>
       <div>
         <h3>{{ room.name }}</h3>
