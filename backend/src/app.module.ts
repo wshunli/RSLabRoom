@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module'
 import { validateEnvironment } from './configuration'
 import { DatabaseModule } from './database/database.module'
 import { HealthController } from './health.controller'
+import { MailModule } from './mail/mail.module'
 import { PublicModule } from './public/public.module'
 
 @Module({
@@ -21,6 +22,7 @@ import { PublicModule } from './public/public.module'
       exclude: ['/api/{*path}'],
     }),
     DatabaseModule,
+    MailModule,
     AuthModule,
     PublicModule,
     AdminModule,

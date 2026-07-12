@@ -10,6 +10,8 @@ const systemSettings = ref({
   semesterWeeks: 0,
   contactName: '',
   contactPhone: '',
+  smtpEnabled: false, smtpHost: '', smtpPort: 465, smtpSecure: true,
+  smtpUser: '', smtpPassword: '', smtpPasswordSet: false, smtpFrom: '', adminEmail: '',
 })
 const settingsSaved = ref(false)
 

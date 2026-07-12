@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { Injectable } from '@nestjs/common'
 import { RowDataPacket } from 'mysql2'
 import { DatabaseService } from '../database/database.service'
+import { MailService } from '../mail/mail.service'
 import { rowToRoom } from '../shared/rooms'
 import { currentWeek, dayIndexOf, formatDate, periodToTag, slotDate, weekRange } from '../shared/time'
 import { CreateApplicationDto } from './public.dto'
@@ -10,7 +11,7 @@ interface ConsoleRow extends RowDataPacket { name: string; value: string }
 
 @Injectable()
 export class PublicService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(private readonly database: DatabaseService, private readonly mail: MailService) {}
 
   private async loadConsole(): Promise<Record<string, string>> {
     const rows = await this.database.query<ConsoleRow[]>('SELECT name, value FROM console')
@@ -70,10 +71,12 @@ export class PublicService {
     const config = await this.loadConsole()
     const semesterStart = config.begtime || formatDate(new Date())
     const groupId = `${Date.now()}${randomUUID().replaceAll('-', '').slice(0, 8)}`
+    const dates: string[] = []
 
     await this.database.transaction(async (connection) => {
       for (const booking of body.slots) {
         const date = booking.date?.slice(0, 10) || slotDate(semesterStart, booking.week, booking.day)
+        dates.push(date)
         await connection.execute(
           `INSERT INTO borrow
             (btimeid, bperson, bname, btime, tag, bclassid, status, bphone, bsoftware, bnumer, bmore)
@@ -89,6 +92,7 @@ export class PublicService {
         [groupId, body.applicantName, body.phone, body.requiredSoftware, String(body.attendees), body.courseName, body.remarks],
       )
     })
-    return { id: groupId, slots: body.slots.length, state: 'pending' }
+    const notificationSent = await this.mail.sendApplicationNotification(groupId, body, dates)
+    return { id: groupId, slots: body.slots.length, state: 'pending', notificationSent }
   }
 }

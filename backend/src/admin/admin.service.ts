@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { ResultSetHeader, RowDataPacket } from 'mysql2'
 import { DatabaseService } from '../database/database.service'
+import { MailService } from '../mail/mail.service'
 import { rowToRoom } from '../shared/rooms'
 import { formatDate, parseDate, PERIOD_HOURS, PERIOD_NAMES, periodToTag, slotDate } from '../shared/time'
 import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
@@ -22,7 +23,7 @@ function userResponse(row: RowDataPacket) {
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(private readonly database: DatabaseService, private readonly mail: MailService) {}
 
   private async loadConsole(): Promise<Record<string, string>> {
     const rows = await this.database.query<RowDataPacket[]>('SELECT name, value FROM console')
@@ -241,6 +242,15 @@ export class AdminService {
       semesterWeeks: Number(config.week || 0),
       contactName: config.lianxiren || '',
       contactPhone: config.lianxidianhua || '',
+      smtpEnabled: config.smtp_enabled === 'true',
+      smtpHost: config.smtp_host || '',
+      smtpPort: Number(config.smtp_port || 465),
+      smtpSecure: config.smtp_secure !== 'false',
+      smtpUser: config.smtp_user || '',
+      smtpPassword: '',
+      smtpPasswordSet: Boolean(config.smtp_password),
+      smtpFrom: config.smtp_from || '',
+      adminEmail: config.admin_email || '',
     }
   }
 
@@ -254,7 +264,15 @@ export class AdminService {
       ['week', String(body.semesterWeeks)],
       ['lianxiren', body.contactName],
       ['lianxidianhua', body.contactPhone],
+      ['smtp_enabled', String(body.smtpEnabled)],
+      ['smtp_host', body.smtpHost.trim()],
+      ['smtp_port', String(body.smtpPort)],
+      ['smtp_secure', String(body.smtpSecure)],
+      ['smtp_user', body.smtpUser.trim()],
+      ['smtp_from', body.smtpFrom.trim()],
+      ['admin_email', body.adminEmail.trim()],
     ]
+    if (body.smtpPassword) values.push(['smtp_password', body.smtpPassword])
     await this.database.transaction(async (connection) => {
       for (const [name, value] of values) {
         const [existing] = await connection.execute<RowDataPacket[]>('SELECT name FROM console WHERE name = ?', [name])
@@ -263,6 +281,14 @@ export class AdminService {
       }
     })
     return { ok: true }
+  }
+
+  async testEmail() {
+    try {
+      return await this.mail.sendTestEmail()
+    } catch (error) {
+      throw new BadRequestException({ error: error instanceof Error ? error.message : '测试邮件发送失败' })
+    }
   }
 
   async getUsers() {

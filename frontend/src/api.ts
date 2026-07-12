@@ -165,6 +165,15 @@ export const api = {
     semesterWeeks: number
     contactName: string
     contactPhone: string
+    smtpEnabled: boolean
+    smtpHost: string
+    smtpPort: number
+    smtpSecure: boolean
+    smtpUser: string
+    smtpPassword: string
+    smtpPasswordSet: boolean
+    smtpFrom: string
+    adminEmail: string
   }>('/admin/settings'),
 
   updateSettings: (payload: {
@@ -174,10 +183,28 @@ export const api = {
     semesterWeeks: number
     contactName: string
     contactPhone: string
-  }) => request<{ ok: boolean }>('/admin/settings', {
-    method: 'PUT',
-    body: JSON.stringify(payload),
-  }),
+    smtpEnabled: boolean
+    smtpHost: string
+    smtpPort: number
+    smtpSecure: boolean
+    smtpUser: string
+    smtpPassword?: string
+    smtpFrom: string
+    adminEmail: string
+  }) => {
+    // GET 响应中包含 smtpPasswordSet 这类只读状态；保存时只发送 DTO 接受的字段，
+    // 避免 NestJS 的严格白名单把响应辅助字段判定为非法属性。
+    const body = {
+      startYear: payload.startYear, startMonth: payload.startMonth, startDay: payload.startDay,
+      semesterWeeks: payload.semesterWeeks, contactName: payload.contactName, contactPhone: payload.contactPhone,
+      smtpEnabled: payload.smtpEnabled, smtpHost: payload.smtpHost, smtpPort: payload.smtpPort,
+      smtpSecure: payload.smtpSecure, smtpUser: payload.smtpUser, smtpPassword: payload.smtpPassword,
+      smtpFrom: payload.smtpFrom, adminEmail: payload.adminEmail,
+    }
+    return request<{ ok: boolean }>('/admin/settings', { method: 'PUT', body: JSON.stringify(body) })
+  },
+
+  testEmail: () => request<{ ok: boolean }>('/admin/settings/test-email', { method: 'POST' }),
 
   // ---- 用户管理 -------------------------------------------------------------
   getUsers: () => request<ManagedUser[]>('/admin/users'),

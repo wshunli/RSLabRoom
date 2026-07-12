@@ -29,6 +29,9 @@ export class AdminController {
   @Put('settings')
   updateSettings(@Body() body: UpdateSettingsDto) { return this.service.updateSettings(body) }
 
+  @Post('settings/test-email')
+  testEmail() { return this.service.testEmail() }
+
   @Get('users')
   getUsers() { return this.service.getUsers() }
 

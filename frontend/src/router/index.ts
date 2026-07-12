@@ -9,6 +9,7 @@ import AdminSchedule from '../views/admin/AdminSchedule.vue'
 import AdminRooms from '../views/admin/AdminRooms.vue'
 import AdminUsers from '../views/admin/AdminUsers.vue'
 import AdminSettings from '../views/admin/AdminSettings.vue'
+import AdminMailSettings from '../views/admin/AdminMailSettings.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -58,6 +59,11 @@ const router = createRouter({
           path: 'users',
           name: 'admin-users',
           component: AdminUsers,
+        },
+        {
+          path: 'mail-settings',
+          name: 'admin-mail-settings',
+          component: AdminMailSettings,
         },
         {
           path: 'settings',

@@ -3,7 +3,7 @@ import { computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   CalendarDays, CircleHelp, DoorOpen,
-  LayoutDashboard, ListChecks, LogOut, Settings2, Users,
+  LayoutDashboard, ListChecks, LogOut, Mail, Settings2, Users,
 } from '@lucide/vue'
 import { adminStore } from '../stores/admin'
 
@@ -24,6 +24,7 @@ const navigation = computed(() => [
   { name: '机房排期', icon: CalendarDays, route: 'admin-schedule' },
   { name: '机房管理', icon: DoorOpen, route: 'admin-rooms' },
   { name: '用户管理', icon: Users, route: 'admin-users' },
+  { name: '邮件通知', icon: Mail, route: 'admin-mail-settings' },
   { name: '系统设置', icon: Settings2, route: 'admin-settings' },
 ])
 

@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer'
-import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator'
+import { IsBoolean, IsEmail, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, ValidateIf } from 'class-validator'
 
 export class ApplicationQueryDto {
   @IsOptional() @IsIn(['pending', 'approved', 'rejected', 'all'])
@@ -39,6 +39,34 @@ export class UpdateSettingsDto {
 
   @IsString() @MaxLength(100)
   contactPhone: string
+
+  @IsBoolean()
+  smtpEnabled = false
+
+  @IsString() @MaxLength(255)
+  smtpHost = ''
+
+  @Type(() => Number) @IsInt() @Min(1) @Max(65535)
+  smtpPort = 465
+
+  @IsBoolean()
+  smtpSecure = true
+
+  @IsString() @MaxLength(255)
+  smtpUser = ''
+
+  @IsOptional() @IsString() @MaxLength(255)
+  smtpPassword?: string
+
+  // 兼容已缓存的旧版设置页：该字段仅用于提示密码是否已配置，服务端忽略其值。
+  @IsOptional() @IsBoolean()
+  smtpPasswordSet?: boolean
+
+  @IsString() @MaxLength(255)
+  smtpFrom = ''
+
+  @ValidateIf((o) => o.adminEmail !== '') @IsEmail() @MaxLength(255)
+  adminEmail = ''
 }
 
 export class CreateScheduleDto {

@@ -8,6 +8,8 @@ ALTER TABLE `class`
   MODIFY `cintro` varchar(1000) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
   MODIFY `cname` varchar(500) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL,
   ENGINE = InnoDB;
+
+-- SMTP 配置沿用 console 键值表，由管理后台按需写入；密码不会通过管理接口回显。
 ALTER TABLE `user`
   ADD COLUMN `name` varchar(50) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
   ADD COLUMN `email` varchar(100) CHARACTER SET utf8 COLLATE utf8_unicode_ci NOT NULL DEFAULT '',
