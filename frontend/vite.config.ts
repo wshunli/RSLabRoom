@@ -6,6 +6,8 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   plugins: [vue()],
   server: {
+    // 监听所有网卡，使同一局域网内的设备可以访问开发服务器。
+    host: '0.0.0.0',
     // 固定端口，避免与本机其他 Vite 项目（5173/5174/5175）混淆。
     port: 5180,
     strictPort: true,
