@@ -30,7 +30,10 @@ const busySlots = ref<Set<string>>(new Set())
 const slotInfo = ref<Map<string, { courseName: string; teacher: string; phone: string; date: string }>>(new Map())
 const week = ref(1)
 const totalWeeks = ref(0)
+const teachingWeeks = ref(0)
 const semesterName = ref('')
+const vacationLabel = ref('')
+const currentWeekLabel = ref('')
 const semesters = ref<Semester[]>([])
 const selectedTerm = ref<number | null>(null)
 const currentTeachingWeek = ref(0)
@@ -57,6 +60,16 @@ const days = computed(() => {
 const weekLabel = computed(() =>
   rangeStart.value ? `${rangeStart.value.replace(/-/g, '.')} — ${rangeEnd.value.replace(/-/g, '.')}` : '')
 
+const weekOptions = computed(() => Array.from({ length: totalWeeks.value }, (_, index) => {
+  const weekNumber = index + 1
+  return {
+    week: weekNumber,
+    label: weekNumber <= teachingWeeks.value
+      ? String(weekNumber)
+      : vacationLabel.value.slice(0, 1),
+  }
+}))
+
 const filteredRooms = computed(() => roomList.value.filter((room) => {
   const matchesQuery = `${room.name}${room.building}`.includes(query.value)
   const matchesCapacity = capacity.value === '全部容量' || room.seats >= Number(capacity.value)
@@ -70,9 +83,12 @@ async function loadAvailability(target?: number, term = selectedTerm.value ?? un
   const data = await api.getAvailability(target, term)
   week.value = data.week
   totalWeeks.value = data.totalWeeks
+  teachingWeeks.value = data.teachingWeeks
   currentTeachingWeek.value = data.currentWeek
   selectedTerm.value = data.term
   semesterName.value = data.semesterLabel
+  currentWeekLabel.value = data.weekLabel
+  vacationLabel.value = data.vacationLabel
   rangeStart.value = data.range.start
   rangeEnd.value = data.range.end
   const busy = new Set<string>()
@@ -142,7 +158,7 @@ function toggleSlot(room: SelectedSlot['room'], day: number, period: number) {
   if (days.value[day]?.past) return
   const index = selected.value.findIndex((slot) => slot.room.id === room.id && slot.day === day && slot.period === period)
   if (index >= 0) selected.value.splice(index, 1)
-  else selected.value.push({ room, day, period })
+  else selected.value.push({ room, day, period, week: week.value, weekLabel: currentWeekLabel.value })
   submitted.value = false
 }
 
@@ -155,6 +171,7 @@ interface SlotDetail {
   date: string
   dayLabel: string
   week: number
+  weekLabel?: string
   period: number
 }
 
@@ -172,6 +189,7 @@ function openDetail(room: Room, day: number, period: number) {
     date: info.date || days.value[day]?.date || '',
     dayLabel: days.value[day]?.week || '',
     week: week.value,
+    weekLabel: currentWeekLabel.value,
     period,
   }
 }
@@ -245,7 +263,7 @@ function finishBooking() {
             :aria-expanded="weekPickerOpen"
             @click="weekPickerOpen = !weekPickerOpen"
           >
-            <CalendarDays :size="17" />{{ weekLabel }} <b>第 {{ week }} 周</b>
+            <CalendarDays :size="17" />{{ weekLabel }} <b>{{ currentWeekLabel }}</b>
             <ChevronDown :size="14" class="week-caret" :class="{ open: weekPickerOpen }" />
           </button>
           <button aria-label="下一周" @click="changeWeek(1)"><ChevronRight :size="17" /></button>
@@ -254,15 +272,15 @@ function finishBooking() {
             <div class="week-pop" role="listbox" aria-label="选择教学周">
               <div class="week-pop-grid">
                 <button
-                  v-for="w in totalWeeks"
-                  :key="w"
+                  v-for="option in weekOptions"
+                  :key="option.week"
                   type="button"
                   role="option"
-                  :aria-selected="w === week"
-                  :class="{ active: w === week, current: w === currentTeachingWeek }"
-                  :title="w === currentTeachingWeek ? '本周' : ''"
-                  @click="selectWeek(w)"
-                >{{ w }}</button>
+                  :aria-selected="option.week === week"
+                  :class="{ active: option.week === week, current: option.week === currentTeachingWeek }"
+                  :title="option.week === currentTeachingWeek ? '本周' : ''"
+                  @click="selectWeek(option.week)"
+                >{{ option.label }}</button>
               </div>
             </div>
           </template>

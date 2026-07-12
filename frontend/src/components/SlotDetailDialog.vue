@@ -11,6 +11,7 @@ defineProps<{
   date?: string
   dayLabel?: string
   week?: number
+  weekLabel?: string
   period: number
 }>()
 const emit = defineEmits<{ close: [] }>()
@@ -30,7 +31,7 @@ const periodTimes = ['08:00–12:00', '14:00–18:00', '18:00–22:00']
         <li v-if="teacher"><UserRound :size="16" /><span>授课教师</span><strong>{{ teacher }}</strong></li>
         <li v-if="phone"><Phone :size="16" /><span>联系手机</span><strong>{{ phone }}</strong></li>
         <li><MapPin :size="16" /><span>使用机房</span><strong>{{ roomName }}<template v-if="building"> · {{ building }}</template></strong></li>
-        <li><CalendarDays :size="16" /><span>上课日期</span><strong><template v-if="week">第 {{ week }} 周　</template>{{ dayLabel }}<template v-if="date">　{{ date }}</template></strong></li>
+        <li><CalendarDays :size="16" /><span>上课日期</span><strong><template v-if="week">{{ weekLabel ?? `第 ${week} 周` }}　</template>{{ dayLabel }}<template v-if="date">　{{ date }}</template></strong></li>
         <li><Clock3 :size="16" /><span>上课时段</span><strong>{{ periods[period] }}　{{ periodTimes[period] }}</strong></li>
       </ul>
     </div>

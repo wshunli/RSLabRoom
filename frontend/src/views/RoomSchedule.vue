@@ -25,6 +25,7 @@ const semesterName = ref('')
 
 interface WeekSchedule {
   week: number
+  weekLabel: string
   rangeStart: string
   rangeEnd: string
   days: { week: string; date: string }[]
@@ -72,6 +73,7 @@ function mapWeek(data: AvailabilityResponse): WeekSchedule {
   }
   return {
     week: data.week,
+    weekLabel: data.weekLabel,
     rangeStart: data.range.start,
     rangeEnd: data.range.end,
     days: buildDays(data.range.start),
@@ -105,6 +107,7 @@ interface SlotDetail {
   date: string
   dayLabel: string
   week: number
+  weekLabel?: string
   period: number
 }
 
@@ -128,6 +131,7 @@ function openDetail(w: WeekSchedule, day: number, period: number) {
     date: info.date || w.days[day].date,
     dayLabel: w.days[day].week,
     week: w.week,
+    weekLabel: w.weekLabel,
     period,
   }
 }
@@ -143,6 +147,7 @@ function toggleSlot(w: WeekSchedule, day: number, period: number) {
       day,
       period,
       week: w.week,
+      weekLabel: w.weekLabel,
       dayLabel: w.days[day].week,
       dateLabel: w.days[day].date,
     })
@@ -265,7 +270,7 @@ watch(roomId, init)
             <p>
               <MapPin :size="13" />{{ room.building }}
               <span class="dot">·</span><Users :size="13" />{{ room.seats }} 座
-              <span class="dot">·</span>共 {{ totalWeeks }} 周（已显示 {{ loadedWeeks.length }} 周）
+              <span class="dot">·</span>共 {{ totalWeeks }} 周（含假期，已显示 {{ loadedWeeks.length }} 周）
             </p>
           </div>
           <div class="legend"><span><i class="free" />空闲</span><span><i class="busy" />已占用</span></div>
@@ -275,7 +280,7 @@ watch(roomId, init)
           <article v-for="w in loadedWeeks" :key="w.week" class="week-card">
             <header class="week-card-head">
               <CalendarDays :size="16" />
-              <strong>第 {{ w.week }} 周</strong>
+              <strong>{{ w.weekLabel }}</strong>
               <small>{{ w.rangeStart.replace(/-/g, '.') }} — {{ w.rangeEnd.replace(/-/g, '.') }}</small>
             </header>
             <div class="schedule">

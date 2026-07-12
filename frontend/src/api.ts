@@ -40,18 +40,23 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 // ---- 公共数据 ---------------------------------------------------------------
 
-// 学期配置：学年、学期序号、开学日期和周数均以后端保存值为准。
+// 学期配置：学年、学期序号、开学日期、教学周数和假期周数均以后端保存值为准。
 export interface Semester {
   startYear: number
   term: number
   startDate: string
   weeks: number
+  extraWeeks: number
 }
 
 export interface SiteConfig {
   semesterStart: string
   totalWeeks: number
+  teachingWeeks: number
   currentWeek: number
+  weekLabel: string
+  isVacation: boolean
+  vacationLabel: string
   semesterLabel: string
   currentTerm: number | null
   semesters: Semester[]
@@ -73,9 +78,13 @@ export interface AvailabilitySlot {
 export interface AvailabilityResponse {
   week: number
   totalWeeks: number
+  teachingWeeks: number
   currentWeek: number
   term: number | null
   semesterLabel: string
+  weekLabel: string
+  isVacation: boolean
+  vacationLabel: string
   range: { start: string; end: string }
   busySlots: string[]
   slots: AvailabilitySlot[]
@@ -181,10 +190,10 @@ export const api = {
   getSemesters: () =>
     request<{ startYear: number; semesters: Semester[]; currentSemesterLabel: string }>('/admin/semesters'),
 
-  updateSemesters: (startYear: number, semesters: Array<Pick<Semester, 'term' | 'startDate' | 'weeks'>>) =>
+  updateSemesters: (startYear: number, semesters: Array<Pick<Semester, 'term' | 'startDate' | 'weeks' | 'extraWeeks'>>) =>
     request<{ startYear: number; semesters: Semester[]; currentSemesterLabel: string }>('/admin/semesters', {
       method: 'PUT',
-      body: JSON.stringify({ startYear, semesters: semesters.map(({ term, startDate, weeks }) => ({ term, startDate, weeks })) }),
+      body: JSON.stringify({ startYear, semesters: semesters.map(({ term, startDate, weeks, extraWeeks }) => ({ term, startDate, weeks, extraWeeks })) }),
     }),
 
   // ---- 系统设置 -------------------------------------------------------------

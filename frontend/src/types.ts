@@ -34,9 +34,10 @@ export interface SelectedSlot {
   room: Room
   day: number
   period: number
-  // 详情页跨多周选择时，记录该时段所属的教学周及其日期标签；
+  // 详情页跨多周选择时，记录该时段所属的周次及其显示标签；
   // 预约大厅为单周选择，可不提供，由调用方按当前周补充。
   week?: number
+  weekLabel?: string
   dayLabel?: string
   dateLabel?: string
 }

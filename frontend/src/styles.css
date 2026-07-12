@@ -149,3 +149,4 @@ a.room-meta:hover h3{color:var(--green)}
 .semester-switch select{border:0;outline:0;appearance:none;background:transparent;color:var(--green);font-weight:600;cursor:pointer;padding:0 2px}
 .semester-switch svg{color:#8a968f;pointer-events:none}
 @media(max-width:800px){.schedule-switches{width:100%;}.semester-switch{flex:1;justify-content:space-between;}.week-switch{width:auto;flex:1;}}
+.week-pop-grid button{width:auto;min-width:40px;padding:0 8px;white-space:nowrap}

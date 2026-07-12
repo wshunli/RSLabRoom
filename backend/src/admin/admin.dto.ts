@@ -21,7 +21,7 @@ export class ApplicationQueryDto {
   pageSize = 15
 }
 
-// 学期配置：一个学年固定包含第一、二、三学期，每学期只需填开学日期与周数。
+// 学期配置：一个学年固定包含第一、二、三学期，每学期可配置教学周数及结束后的假期周数。
 export class SemesterDto {
   @Type(() => Number) @IsInt() @Min(1) @Max(3)
   term: number
@@ -31,6 +31,9 @@ export class SemesterDto {
 
   @Type(() => Number) @IsInt() @Min(1) @Max(60)
   weeks: number
+
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0) @Max(60)
+  extraWeeks: number
 }
 
 export class UpdateSemestersDto {

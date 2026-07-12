@@ -1,10 +1,23 @@
 import 'reflect-metadata'
 import { BadRequestException, Logger, ValidationPipe } from '@nestjs/common'
+import { ValidationError } from 'class-validator'
 import { ConfigService } from '@nestjs/config'
 import { NestFactory } from '@nestjs/core'
 import helmet from 'helmet'
 import { AppModule } from './app.module'
 import { HttpExceptionFilter } from './common/http-exception.filter'
+
+function firstValidationMessage(errors: ValidationError[]): string {
+  for (const error of errors) {
+    const message = Object.values(error.constraints || {})[0]
+    if (message) return message
+    if (error.children?.length) {
+      const nested = firstValidationMessage(error.children)
+      if (nested) return nested
+    }
+  }
+  return '请求参数不正确'
+}
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { cors: false })
@@ -15,7 +28,7 @@ async function bootstrap(): Promise<void> {
     forbidNonWhitelisted: true,
     transform: true,
     exceptionFactory: (errors) => new BadRequestException({
-      error: Object.values(errors[0]?.constraints || {})[0] || '请求参数不正确',
+      error: firstValidationMessage(errors),
     }),
   }))
   app.enableShutdownHooks()

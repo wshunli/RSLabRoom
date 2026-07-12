@@ -165,7 +165,8 @@ function addDailyRule() {
 onMounted(async () => {
   try {
     const config = await api.getConfig()
-    semesterWeeks.value = config.totalWeeks || 1
+    // 假期周只用于查看与预约，批量排课仍限制在正式教学周内。
+    semesterWeeks.value = config.teachingWeeks || config.totalWeeks || 1
     semesterName.value = config.semesterLabel
     currentTeachingWeek.value = config.currentWeek
     // 以当前教学周为起点，限制在 [1, 学期周数] 之间

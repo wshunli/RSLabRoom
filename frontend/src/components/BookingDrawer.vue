@@ -59,7 +59,7 @@ function submitForm() {
           <div class="selection-title"><Monitor /><strong>已选择 {{ values.length }} 个预约时段</strong></div>
           <div v-for="value in values" :key="`${value.room.id}-${value.week ?? ''}-${value.day}-${value.period}`" class="chosen-slot">
             <div>
-              <strong>{{ value.room.name }} · <template v-if="value.week">第 {{ value.week }} 周 </template>{{ value.dayLabel ?? days[value.day].week }} {{ periods[value.period] }}</strong>
+              <strong>{{ value.room.name }} · <template v-if="value.week">{{ value.weekLabel ?? `第 ${value.week} 周` }} </template>{{ value.dayLabel ?? days[value.day].week }} {{ periods[value.period] }}</strong>
               <span>{{ value.room.building }}　{{ value.dateLabel ?? days[value.day].date }}　{{ periodTimes[value.period] }}</span>
             </div>
           </div>

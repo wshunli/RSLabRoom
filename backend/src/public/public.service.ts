@@ -5,14 +5,15 @@ import { DatabaseService } from '../database/database.service'
 import { MailService } from '../mail/mail.service'
 import { rowToRoom } from '../shared/rooms'
 import { currentWeek, dayIndexOf, formatDate, periodToTag, slotDate, weekRange } from '../shared/time'
-import { currentSemester, Semester, semesterLabel, semestersFromConfig } from '../shared/semesters'
+import { currentSemester, isVacationWeek, Semester, semesterLabel, semesterTotalWeeks, semesterWeekLabel, vacationLabel } from '../shared/semesters'
+import { SemesterStore } from '../shared/semester-store.service'
 import { CreateApplicationDto } from './public.dto'
 
 interface ConsoleRow extends RowDataPacket { name: string; value: string }
 
 @Injectable()
 export class PublicService {
-  constructor(private readonly database: DatabaseService, private readonly mail: MailService) {}
+  constructor(private readonly database: DatabaseService, private readonly mail: MailService, private readonly semesterStore: SemesterStore) {}
 
   private async loadConsole(): Promise<Record<string, string>> {
     const rows = await this.database.query<ConsoleRow[]>('SELECT name, value FROM console')
@@ -25,8 +26,7 @@ export class PublicService {
     semesters: Semester[]
     semester: Semester | null
   }> {
-    const config = await this.loadConsole()
-    const semesters = semestersFromConfig(config)
+    const [config, semesters] = await Promise.all([this.loadConsole(), this.semesterStore.list()])
     const selected = Number.isInteger(term) ? semesters.find((item) => item.term === term) : undefined
     return { config, semesters, semester: selected ?? currentSemester(semesters) }
   }
@@ -34,18 +34,23 @@ export class PublicService {
   private teachingWeek(semester: Semester | null): number {
     if (!semester) return 1
     const week = currentWeek(semester.startDate)
-    return Math.min(Math.max(week, 1), semester.weeks || Math.max(week, 1))
+    return Math.min(Math.max(week, 1), semesterTotalWeeks(semester) || Math.max(week, 1))
   }
 
   async getConfig() {
     const { config, semesters, semester } = await this.activeSemester()
     const semesterStart = semester?.startDate || formatDate(new Date())
-    const totalWeeks = semester?.weeks || 0
+    const teachingWeeks = semester?.weeks || 0
+    const totalWeeks = semester ? semesterTotalWeeks(semester) : 0
     const week = this.teachingWeek(semester)
     return {
       semesterStart,
       totalWeeks,
+      teachingWeeks,
       currentWeek: week,
+      weekLabel: semester ? semesterWeekLabel(semester, week) : '',
+      isVacation: semester ? isVacationWeek(semester, week) : false,
+      vacationLabel: semester ? vacationLabel(semester) : '',
       semesterLabel: semester ? semesterLabel(semester) : '',
       currentTerm: semester?.term ?? null,
       semesters: semesters.filter((item) => [1, 2, 3].includes(item.term)),
@@ -63,7 +68,8 @@ export class PublicService {
   async getAvailability(requestedWeek?: number, term?: number) {
     const { semesters, semester } = await this.activeSemester(term)
     const semesterStart = semester?.startDate || formatDate(new Date())
-    const totalWeeks = semester?.weeks || 0
+    const teachingWeeks = semester?.weeks || 0
+    const totalWeeks = semester ? semesterTotalWeeks(semester) : 0
     const week = requestedWeek ?? this.teachingWeek(semester)
     const active = currentSemester(semesters)
     const currentTeachingWeek = active?.term === semester?.term ? this.teachingWeek(semester) : 0
@@ -91,9 +97,13 @@ export class PublicService {
     return {
       week,
       totalWeeks,
+      teachingWeeks,
       currentWeek: currentTeachingWeek,
       term: semester?.term ?? null,
       semesterLabel: semester ? semesterLabel(semester) : '',
+      weekLabel: semester ? semesterWeekLabel(semester, week) : `第 ${week} 周`,
+      isVacation: semester ? isVacationWeek(semester, week) : false,
+      vacationLabel: semester ? vacationLabel(semester) : '',
       range,
       busySlots: slots.map((slot) => slot.key),
       slots,

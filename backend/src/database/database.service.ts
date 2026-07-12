@@ -30,6 +30,12 @@ export class DatabaseService implements OnApplicationShutdown {
     return rows as T
   }
 
+  // DDL（例如 CREATE TABLE）使用普通查询，兼容 MySQL 对预处理 DDL 的限制。
+  async queryRaw<T extends QueryResult = RowDataPacket[]>(sql: string, params: any[] = []): Promise<T> {
+    const [rows] = await this.pool.query(sql, params)
+    return rows as T
+  }
+
   async queryOne<T extends RowDataPacket = RowDataPacket>(sql: string, params: any[] = []): Promise<T | undefined> {
     const rows = await this.query<T[]>(sql, params)
     return rows[0]

@@ -3,13 +3,13 @@ import { nextTick, onMounted, ref, watch } from 'vue'
 import { CalendarDays, CalendarRange, Check, Clock3, GraduationCap, Save } from '@lucide/vue'
 import { api, type Semester } from '../../api'
 
-type EditableSemester = Pick<Semester, 'term' | 'startDate' | 'weeks'>
+type EditableSemester = Pick<Semester, 'term' | 'startDate' | 'weeks' | 'extraWeeks'>
 
 const TERM_NAMES = ['第一学期', '第二学期', '第三学期']
 const defaultYear = new Date().getFullYear()
 
 const startYear = ref(defaultYear)
-// 学期固定为第一、二、三学期，只需配置各自的开学日期与周数
+// 学期固定为第一、二、三学期，配置各自的开学日期、教学周数与假期周数。
 const terms = ref<EditableSemester[]>(defaultTerms(defaultYear))
 const currentSemesterLabel = ref('')
 // 学年与学期两个表单各自显示保存结果
@@ -17,9 +17,9 @@ const feedback = ref<{ target: 'year' | 'terms'; ok: boolean; text: string } | n
 
 function defaultTerms(year: number): EditableSemester[] {
   return [
-    { term: 1, startDate: `${year}-09-01`, weeks: 18 },
-    { term: 2, startDate: `${year + 1}-03-01`, weeks: 18 },
-    { term: 3, startDate: `${year + 1}-07-01`, weeks: 6 },
+    { term: 1, startDate: `${year}-09-01`, weeks: 18, extraWeeks: 0 },
+    { term: 2, startDate: `${year + 1}-03-01`, weeks: 18, extraWeeks: 0 },
+    { term: 3, startDate: `${year + 1}-07-01`, weeks: 6, extraWeeks: 0 },
   ]
 }
 
@@ -51,6 +51,7 @@ function validate(): string {
     const name = TERM_NAMES[semester.term - 1]
     if (!semester.startDate) return `${name}未填写开学日期`
     if (!(semester.weeks >= 1)) return `${name}的周数无效`
+    if (!Number.isInteger(semester.extraWeeks) || semester.extraWeeks < 0) return `${name}的假期周数无效`
     if (semester.startDate < rangeStart || semester.startDate > rangeEnd) {
       return `${name}的开学日期不在 ${startYear.value}-${startYear.value + 1} 学年内（${startYear.value} 年 8 月 — ${startYear.value + 1} 年 7 月）`
     }
@@ -63,7 +64,9 @@ function applyResponse(res: { startYear: number; semesters: Semester[]; currentS
   startYear.value = res.startYear
   terms.value = defaultTerms(res.startYear).map((fallback) => {
     const stored = res.semesters.find((s) => s.term === fallback.term)
-    return stored ? { term: stored.term, startDate: stored.startDate, weeks: stored.weeks } : fallback
+    return stored
+      ? { term: stored.term, startDate: stored.startDate, weeks: stored.weeks, extraWeeks: stored.extraWeeks ?? 0 }
+      : fallback
   })
   currentSemesterLabel.value = res.currentSemesterLabel
   void nextTick(() => { syncing = false })
@@ -94,7 +97,7 @@ onMounted(async () => {
 <template>
   <section class="admin-main semesters-page">
     <div class="admin-title">
-      <div><span class="kicker">SEMESTER SETTINGS</span><h1>学期设置</h1><p>维护学年、开学日期和教学周数，当前学期将由系统自动识别。</p></div>
+      <div><span class="kicker">SEMESTER SETTINGS</span><h1>学期设置</h1><p>维护学年、开学日期、教学周数和学期结束后的假期周数。</p></div>
       <span class="date-card"><CalendarRange /><b>{{ currentSemesterLabel || '未配置学期' }}</b><small>当前学期</small></span>
     </div>
 
@@ -117,7 +120,7 @@ onMounted(async () => {
         </form>
 
         <form class="panel semesters-form" @submit.prevent="save('terms')">
-          <div class="panel-head"><div><h2>{{ Number.isInteger(startYear) ? `${startYear}-${startYear + 1} 学年` : '' }}学期安排</h2><p>设置每个学期的开学日期与实际教学周数。</p></div></div>
+          <div class="panel-head"><div><h2>{{ Number.isInteger(startYear) ? `${startYear}-${startYear + 1} 学年` : '' }}学期安排</h2><p>设置开学日期、实际教学周数，以及结束后显示的假期周数。</p></div></div>
 
           <div v-for="semester in terms" :key="semester.term" class="semester-row" :class="{ current: label(semester.term) === currentSemesterLabel }">
             <div class="semester-row-title">
@@ -132,6 +135,10 @@ onMounted(async () => {
               <label class="semester-field">
                 <span><Clock3 />教学周数</span>
                 <span class="setting-suffix"><input v-model.number="semester.weeks" type="number" min="1" max="30" required :aria-label="`${TERM_NAMES[semester.term - 1]}教学周数`"><span>周</span></span>
+              </label>
+              <label class="semester-field">
+                <span><CalendarRange />{{ semester.term === 1 ? '寒假延长' : '暑假延长' }}</span>
+                <span class="setting-suffix"><input v-model.number="semester.extraWeeks" type="number" min="0" max="30" required :aria-label="`${TERM_NAMES[semester.term - 1]}${semester.term === 1 ? '寒假' : '暑假'}延长周数`"><span>周</span></span>
               </label>
             </div>
           </div>

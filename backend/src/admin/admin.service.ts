@@ -7,7 +7,8 @@ import { JwtService } from '@nestjs/jwt'
 import { UnauthorizedException } from '@nestjs/common'
 import { rowToRoom } from '../shared/rooms'
 import { formatDate, parseDate, PERIOD_HOURS, PERIOD_NAMES, periodToTag, slotDate } from '../shared/time'
-import { currentSemester, Semester, semesterLabel, semestersFromConfig, sortSemesters } from '../shared/semesters'
+import { currentSemester, Semester, semesterLabel, semesterTotalWeeks, sortSemesters } from '../shared/semesters'
+import { SemesterStore } from '../shared/semester-store.service'
 import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateSemestersDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
 
 const STATE_BY_CODE: Record<number, string> = { 0: 'pending', 1: 'approved', 2: 'rejected' }
@@ -26,7 +27,7 @@ function userResponse(row: RowDataPacket) {
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly database: DatabaseService, private readonly mail: MailService, private readonly jwt: JwtService) {}
+  constructor(private readonly database: DatabaseService, private readonly mail: MailService, private readonly jwt: JwtService, private readonly semesterStore: SemesterStore) {}
 
   private async loadConsole(): Promise<Record<string, string>> {
     const rows = await this.database.query<RowDataPacket[]>('SELECT name, value FROM console')
@@ -236,8 +237,7 @@ export class AdminService {
   }
 
   async getSemesters() {
-    const config = await this.loadConsole()
-    const semesters = semestersFromConfig(config)
+    const semesters = await this.semesterStore.list()
     const active = currentSemester(semesters)
     // 学年直接读取已保存配置；首次配置时仅提供当前年份作为表单初始值。
     const startYear = sortSemesters(semesters)[0]?.startYear ?? new Date().getFullYear()
@@ -260,15 +260,21 @@ export class AdminService {
       }
       if (seen.has(item.term)) throw new BadRequestException({ error: `第${item.term}学期配置重复` })
       seen.add(item.term)
-      return { startYear: body.startYear, term: item.term, startDate: item.startDate, weeks: item.weeks }
+      return {
+        startYear: body.startYear,
+        term: item.term,
+        startDate: item.startDate,
+        weeks: item.weeks,
+        extraWeeks: item.extraWeeks ?? 0,
+      }
     })
     const sorted = sortSemesters(semesters)
+    await this.semesterStore.replace(body.startYear, sorted)
     // begtime/week 保留为「当前学期」的快照，兼容仍直接读取这两个键的旧版预约大厅页面。
     const active = currentSemester(sorted) || sorted[0]
     await this.saveConsole([
-      ['semesters', JSON.stringify(sorted)],
       ['begtime', active.startDate],
-      ['week', String(active.weeks)],
+      ['week', String(semesterTotalWeeks(active))],
     ])
     return this.getSemesters()
   }
@@ -437,8 +443,7 @@ export class AdminService {
   // 批量排期不再单独记录批次表，而是生成一条普通申请（borrow + submit，待审批），
   // 直接进入「预约审批」流程，与首页预约提交一致。
   async createSchedule(body: CreateScheduleDto) {
-    const config = await this.loadConsole()
-    const active = currentSemester(semestersFromConfig(config))
+    const active = currentSemester(await this.semesterStore.list())
     const semesterStart = active?.startDate || formatDate(new Date())
     const dates = body.mode === 'daily'
       ? this.dailyDates(body, semesterStart)

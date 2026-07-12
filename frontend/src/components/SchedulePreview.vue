@@ -96,11 +96,12 @@ function busyCourseName(week: number, day: number, period: number) {
   return busyFor(week).get(`${day}-${period}`)?.courseName || '已占用'
 }
 
-type WeekItem = { week: number; label: string; days: { week: string; date: string }[] }
+type WeekItem = { week: number; weekLabel: string; label: string; days: { week: string; date: string }[] }
 const weekItems = computed<WeekItem[]>(() => weeks.value.map((week) => {
   const data = cache.value.get(week)
   return {
     week,
+    weekLabel: data?.weekLabel ?? `第 ${week} 周`,
     label: data ? `${data.range.start.replace(/-/g, '.')} — ${data.range.end.replace(/-/g, '.')}` : '加载中...',
     days: daysFor(data?.range.start ?? ''),
   }
@@ -111,7 +112,7 @@ const allLoaded = computed(() => weeks.value.every((week) => cache.value.has(wee
 // 点击已占用（含与本次排期冲突）的单元格，弹出课程详情
 const slotDetail = ref<{
   roomName: string; building: string; courseName: string; teacher: string
-  phone: string; date: string; dayLabel: string; week: number; period: number
+  phone: string; date: string; dayLabel: string; week: number; weekLabel?: string; period: number
 } | null>(null)
 
 function onCellClick(item: WeekItem, day: number, period: number) {
@@ -128,6 +129,7 @@ function onCellClick(item: WeekItem, day: number, period: number) {
     date: info.date || item.days[day]?.date || '',
     dayLabel: item.days[day]?.week ?? '',
     week: item.week,
+    weekLabel: item.weekLabel,
     period,
   }
 }
@@ -168,7 +170,7 @@ function onCellClick(item: WeekItem, day: number, period: number) {
           <article v-for="w in weekItems" :key="w.week" class="week-card">
           <header class="week-card-head">
             <CalendarDays :size="16" />
-            <strong>第 {{ w.week }} 周</strong>
+            <strong>{{ w.weekLabel }}</strong>
             <small>{{ w.label }}</small>
           </header>
           <div class="schedule">
