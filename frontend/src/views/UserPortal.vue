@@ -41,6 +41,27 @@ const weekPickerOpen = ref(false)
 const rangeStart = ref('')
 const rangeEnd = ref('')
 
+// 左右切换按三个学期组成的完整时间轴运行，而不是限制在当前学期内。
+// 每个学期的最后一周包含该学期配置的假期周数，第三学期的最后一周
+// 就是整个预约大厅允许浏览的终点。
+const orderedSemesters = computed(() =>
+  [...semesters.value].sort((a, b) => a.startDate.localeCompare(b.startDate)),
+)
+
+const selectedSemesterIndex = computed(() =>
+  orderedSemesters.value.findIndex((semester) => semester.term === selectedTerm.value),
+)
+
+const canGoPrevious = computed(() =>
+  week.value > 1 || selectedSemesterIndex.value > 0,
+)
+
+const canGoNext = computed(() => {
+  if (week.value < totalWeeks.value) return true
+  return selectedSemesterIndex.value >= 0
+    && selectedSemesterIndex.value < orderedSemesters.value.length - 1
+})
+
 function addDays(date: string, n: number) {
   const [y, m, d] = date.split('-').map(Number)
   const next = new Date(y, m - 1, d + n)
@@ -103,10 +124,24 @@ async function loadAvailability(target?: number, term = selectedTerm.value ?? un
 }
 
 async function changeWeek(delta: number) {
-  const next = week.value + delta
-  if (next < 1 || (totalWeeks.value && next > totalWeeks.value)) return
+  const currentIndex = selectedSemesterIndex.value
+  const currentSemester = orderedSemesters.value[currentIndex]
+  let nextWeek = week.value + delta
+  let nextTerm = selectedTerm.value ?? undefined
+
+  if (nextWeek < 1) {
+    if (currentIndex <= 0 || !currentSemester) return
+    const previousSemester = orderedSemesters.value[currentIndex - 1]
+    nextTerm = previousSemester.term
+    nextWeek = previousSemester.weeks + previousSemester.extraWeeks
+  } else if (nextWeek > totalWeeks.value) {
+    if (currentIndex < 0 || currentIndex >= orderedSemesters.value.length - 1) return
+    nextTerm = orderedSemesters.value[currentIndex + 1].term
+    nextWeek = 1
+  }
+
   try {
-    await loadAvailability(next)
+    await loadAvailability(nextWeek, nextTerm)
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载失败'
   }
@@ -255,7 +290,7 @@ function finishBooking() {
             <ChevronDown :size="14" />
           </label>
           <div class="week-switch">
-          <button aria-label="上一周" @click="changeWeek(-1)"><ChevronLeft :size="17" /></button>
+          <button aria-label="上一周" :disabled="!canGoPrevious" @click="changeWeek(-1)"><ChevronLeft :size="17" /></button>
           <button
             type="button"
             class="week-current"
@@ -266,7 +301,7 @@ function finishBooking() {
             <CalendarDays :size="17" />{{ weekLabel }} <b>{{ currentWeekLabel }}</b>
             <ChevronDown :size="14" class="week-caret" :class="{ open: weekPickerOpen }" />
           </button>
-          <button aria-label="下一周" @click="changeWeek(1)"><ChevronRight :size="17" /></button>
+          <button aria-label="下一周" :disabled="!canGoNext" @click="changeWeek(1)"><ChevronRight :size="17" /></button>
           <template v-if="weekPickerOpen">
             <div class="week-pop-backdrop" @click="weekPickerOpen = false" />
             <div class="week-pop" role="listbox" aria-label="选择教学周">
