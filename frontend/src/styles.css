@@ -84,6 +84,34 @@
 
 .room-time-note{margin:16px 0 0;text-align:right;color:#6f7d77;font-size:12px;line-height:1.7}
 @media(max-width:800px){.room-time-note{text-align:left;font-size:12px}}
+.mobile-login,.mobile-session{display:none}
+@media(max-width:800px){
+  .topbar .top-actions{display:none}
+  .topbar .brand-copy span{display:block;font-size:10px;letter-spacing:.03em;margin-top:1px}
+  .topbar .menu-btn{display:flex;width:38px;height:38px;padding:0;align-items:center;justify-content:center;color:var(--green);background:#eef6f2;border-radius:9px}
+  .topbar .menu-btn:hover{background:#e1f0e9}
+  .topbar nav .mobile-login{display:flex;align-items:center;justify-content:center;gap:7px;color:#65736d;background:transparent;border:0;border-radius:0}
+  .topbar nav .mobile-session{display:flex;align-items:center;justify-content:center;gap:7px;color:#6e7a75}
+}
+/* 预约大厅：手机端时段仅显示课程名或“空闲”，并使用相同字号 */
+@media(max-width:800px){
+  .room-row .room-meta{padding:10px 12px;align-items:center;justify-content:flex-end;gap:8px;overflow-x:auto;white-space:nowrap}
+  .room-row .room-number{display:none}
+  .room-row .room-meta>div:last-child{display:flex;align-items:center;justify-content:flex-end;gap:8px;width:100%;min-width:max-content;margin-left:auto}
+  .room-row .room-meta h3{margin:0 auto 0 0;font-size:14px}
+  .room-row .room-meta p{font-size:11px}
+  .room-row .room-tags{margin:0;gap:4px}
+  .room-row .room-tags span{padding:3px 5px;font-size:10px}
+  .room-row .schedule{padding:7px 8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .room-row .schedule-head>span{padding:2px}
+  .room-row .schedule-head,.room-row .schedule-line{grid-template-columns:48px repeat(7,70px);min-width:559px;gap:3px}
+  .room-row .schedule-head b,.room-row .schedule-head small{white-space:nowrap}
+  .room-row .schedule-line{margin-top:3px}
+  .room-row .schedule-line button{height:32px}
+  .room-row .schedule-line button.busy span{display:block;max-width:6em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px;line-height:1.25}
+  .room-row .schedule-line button.free>span{font-size:11px;line-height:1.25}
+  .room-row .schedule-line button small{display:none}
+}
 
 /* 机房可点击：进入本学期完整预约页 */
 a.room-meta{text-decoration:none;color:inherit;cursor:pointer;transition:background .15s}

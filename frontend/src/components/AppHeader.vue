@@ -30,6 +30,11 @@ function handleAdminClick() {
   emit('login')
 }
 
+function handleLogout() {
+  mobileNav.value = false
+  emit('logout')
+}
+
 watch(
   () => props.admin,
   (admin) => {
@@ -48,6 +53,8 @@ watch(
       <button :class="{ active: currentMode === 'user' }" @click="navigateTo('user')">预约大厅</button>
       <button :class="{ active: currentMode === 'guide' }" @click="navigateTo('guide')">使用指南</button>
       <button v-if="admin" :class="{ active: currentMode === 'admin' }" @click="navigateTo('admin-approval')">管理后台</button>
+      <button v-if="admin" class="mobile-session" @click="handleLogout"><LogOut :size="17" />退出登录</button>
+      <button v-else class="mobile-login" @click="handleAdminClick"><LogIn :size="17" />管理员登录</button>
     </nav>
     <div class="top-actions">
       <template v-if="admin">
