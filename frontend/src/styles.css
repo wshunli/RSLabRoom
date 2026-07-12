@@ -142,3 +142,10 @@ a.room-meta:hover h3{color:var(--green)}
 .load-more{display:flex;align-items:center;justify-content:center;gap:7px;padding:22px;color:#7c8983;font-size:12px}
 .load-more svg{color:var(--green)}
 .load-end{text-align:center;padding:22px;color:#9aa59f;font-size:12px}
+
+/* 预约大厅：学期选择位于周次切换之前 */
+.schedule-switches{display:flex;align-items:center;gap:8px}
+.semester-switch{height:46px;display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;border-radius:12px;padding:5px 10px 5px 13px;color:#53615b;font-size:13px;font-weight:600}
+.semester-switch select{border:0;outline:0;appearance:none;background:transparent;color:var(--green);font-weight:600;cursor:pointer;padding:0 2px}
+.semester-switch svg{color:#8a968f;pointer-events:none}
+@media(max-width:800px){.schedule-switches{width:100%;}.semester-switch{flex:1;justify-content:space-between;}.week-switch{width:auto;flex:1;}}

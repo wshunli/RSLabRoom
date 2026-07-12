@@ -53,6 +53,8 @@ export interface SiteConfig {
   totalWeeks: number
   currentWeek: number
   semesterLabel: string
+  currentTerm: number | null
+  semesters: Semester[]
   contact: { name: string; phone: string }
 }
 
@@ -71,6 +73,9 @@ export interface AvailabilitySlot {
 export interface AvailabilityResponse {
   week: number
   totalWeeks: number
+  currentWeek: number
+  term: number | null
+  semesterLabel: string
   range: { start: string; end: string }
   busySlots: string[]
   slots: AvailabilitySlot[]
@@ -104,11 +109,17 @@ export const api = {
   getRooms: () => request<Room[]>('/rooms'),
 
   // week 省略时后端返回当前教学周。
-  getAvailability: (week?: number) =>
-    request<AvailabilityResponse>(`/availability${week ? `?week=${week}` : ''}`),
+  getAvailability: (week?: number, term?: number) => {
+    const params = new URLSearchParams()
+    if (week !== undefined) params.set('week', String(week))
+    if (term !== undefined) params.set('term', String(term))
+    const query = params.toString()
+    return request<AvailabilityResponse>(`/availability${query ? `?${query}` : ''}`)
+  },
 
   // ---- 提交申请 -------------------------------------------------------------
   submitApplication: (payload: {
+    semesterTerm?: number
     applicantName: string
     phone: string
     attendees: number

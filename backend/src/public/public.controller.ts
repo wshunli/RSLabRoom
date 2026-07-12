@@ -13,8 +13,11 @@ export class PublicController {
   getRooms() { return this.service.getRooms() }
 
   @Get('availability')
-  getAvailability(@Query('week', new ParseIntPipe({ optional: true })) week?: number) {
-    return this.service.getAvailability(week)
+  getAvailability(
+    @Query('week', new ParseIntPipe({ optional: true })) week?: number,
+    @Query('term', new ParseIntPipe({ optional: true })) term?: number,
+  ) {
+    return this.service.getAvailability(week, term)
   }
 
   @Post('applications')

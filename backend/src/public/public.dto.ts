@@ -32,6 +32,9 @@ export class BookingSlotDto {
 }
 
 export class CreateApplicationDto {
+  @Type(() => Number) @IsOptional() @IsInt() @Min(1) @Max(3)
+  semesterTerm?: number
+
   @IsString() @IsNotEmpty() @MaxLength(10)
   applicantName: string
 

@@ -9,6 +9,7 @@ import RoomRow from '../components/RoomRow.vue'
 import SlotDetailDialog from '../components/SlotDetailDialog.vue'
 import CountUp from '../components/CountUp.vue'
 import { api } from '../api'
+import type { Semester } from '../api'
 import { isDayPast, periods, weekdays } from '../data'
 import type { Room, SelectedSlot } from '../types'
 
@@ -30,6 +31,8 @@ const slotInfo = ref<Map<string, { courseName: string; teacher: string; phone: s
 const week = ref(1)
 const totalWeeks = ref(0)
 const semesterName = ref('')
+const semesters = ref<Semester[]>([])
+const selectedTerm = ref<number | null>(null)
 const currentTeachingWeek = ref(0)
 const weekPickerOpen = ref(false)
 const rangeStart = ref('')
@@ -63,10 +66,13 @@ const filteredRooms = computed(() => roomList.value.filter((room) => {
 const freeSlotCount = computed(() =>
   Math.max(roomList.value.length * 7 * periods.length - busySlots.value.size, 0))
 
-async function loadAvailability(target: number) {
-  const data = await api.getAvailability(target)
+async function loadAvailability(target?: number, term = selectedTerm.value ?? undefined) {
+  const data = await api.getAvailability(target, term)
   week.value = data.week
   totalWeeks.value = data.totalWeeks
+  currentTeachingWeek.value = data.currentWeek
+  selectedTerm.value = data.term
+  semesterName.value = data.semesterLabel
   rangeStart.value = data.range.start
   rangeEnd.value = data.range.end
   const busy = new Set<string>()
@@ -100,14 +106,31 @@ async function selectWeek(target: number) {
   }
 }
 
+async function changeSemester(term: number) {
+  if (term === selectedTerm.value) return
+  selectedTerm.value = term
+  weekPickerOpen.value = false
+  try {
+    // 切换学期后由后端返回该学期适用的当前教学周；未来学期会从第 1 周开始。
+    await loadAvailability(undefined, term)
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '加载失败'
+  }
+}
+
+function onSemesterChange(event: Event) {
+  changeSemester(Number((event.target as HTMLSelectElement).value))
+}
+
 onMounted(async () => {
   try {
     const [config, rooms] = await Promise.all([api.getConfig(), api.getRooms()])
-    totalWeeks.value = config.totalWeeks
-    semesterName.value = config.semesterLabel
-    currentTeachingWeek.value = config.currentWeek
+    semesters.value = config.semesters
+      .filter((semester) => [1, 2, 3].includes(semester.term))
+      .sort((a, b) => a.term - b.term)
+    selectedTerm.value = config.currentTerm ?? semesters.value[0]?.term ?? null
     roomList.value = rooms
-    await loadAvailability(config.currentWeek)
+    await loadAvailability(config.currentTerm === selectedTerm.value ? config.currentWeek : undefined)
   } catch (err) {
     error.value = err instanceof Error ? err.message : '加载失败'
   } finally {
@@ -173,7 +196,7 @@ async function handleSubmit(form: BookingForm) {
     period: slot.period,
   }))
   try {
-    const res = await api.submitApplication({ ...form, slots })
+    const res = await api.submitApplication({ ...form, semesterTerm: selectedTerm.value ?? undefined, slots })
     lastAppId.value = res.id
     submitted.value = true
   } catch (err) {
@@ -206,7 +229,14 @@ function finishBooking() {
     <section class="content-section">
       <div class="section-heading">
         <div><span class="kicker">ROOM AVAILABILITY</span><h2>本周机房安排</h2><p>{{ semesterName ? `${semesterName} · ` : '' }}点击空闲时段即可发起预约申请</p></div>
-        <div class="week-switch">
+        <div class="schedule-switches">
+          <label v-if="semesters.length" class="semester-switch">
+            <select :value="selectedTerm ?? undefined" aria-label="选择学期" @change="onSemesterChange">
+              <option v-for="semester in semesters" :key="semester.term" :value="semester.term">第 {{ semester.term }} 学期</option>
+            </select>
+            <ChevronDown :size="14" />
+          </label>
+          <div class="week-switch">
           <button aria-label="上一周" @click="changeWeek(-1)"><ChevronLeft :size="17" /></button>
           <button
             type="button"
@@ -237,6 +267,7 @@ function finishBooking() {
             </div>
           </template>
         </div>
+      </div>
       </div>
       <div class="filters">
         <label><Search :size="18" /><input v-model="query" placeholder="搜索机房或楼宇"></label>

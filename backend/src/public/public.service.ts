@@ -19,22 +19,36 @@ export class PublicService {
     return Object.fromEntries(rows.map((row) => [row.name, row.value]))
   }
 
-  // 当前学期：按今天日期从学年学期配置中自动选取。
-  private async activeSemester(): Promise<{ config: Record<string, string>; semester: Semester | null }> {
+  // 未指定学期时按今天日期自动选取；指定 term 时允许查看第 1/2/3 学期。
+  private async activeSemester(term?: number): Promise<{
+    config: Record<string, string>
+    semesters: Semester[]
+    semester: Semester | null
+  }> {
     const config = await this.loadConsole()
-    return { config, semester: currentSemester(semestersFromConfig(config)) }
+    const semesters = semestersFromConfig(config)
+    const selected = Number.isInteger(term) ? semesters.find((item) => item.term === term) : undefined
+    return { config, semesters, semester: selected ?? currentSemester(semesters) }
+  }
+
+  private teachingWeek(semester: Semester | null): number {
+    if (!semester) return 1
+    const week = currentWeek(semester.startDate)
+    return Math.min(Math.max(week, 1), semester.weeks || Math.max(week, 1))
   }
 
   async getConfig() {
-    const { config, semester } = await this.activeSemester()
+    const { config, semesters, semester } = await this.activeSemester()
     const semesterStart = semester?.startDate || formatDate(new Date())
     const totalWeeks = semester?.weeks || 0
-    const week = currentWeek(semesterStart)
+    const week = this.teachingWeek(semester)
     return {
       semesterStart,
       totalWeeks,
-      currentWeek: Math.min(Math.max(week, 1), totalWeeks || week),
+      currentWeek: week,
       semesterLabel: semester ? semesterLabel(semester) : '',
+      currentTerm: semester?.term ?? null,
+      semesters: semesters.filter((item) => [1, 2, 3].includes(item.term)),
       contact: { name: config.lianxiren || '', phone: config.lianxidianhua || '' },
     }
   }
@@ -46,11 +60,13 @@ export class PublicService {
     return rows.map((row) => rowToRoom(row as { cid: number; cname: string; cintro: string }))
   }
 
-  async getAvailability(requestedWeek?: number) {
-    const { semester } = await this.activeSemester()
+  async getAvailability(requestedWeek?: number, term?: number) {
+    const { semesters, semester } = await this.activeSemester(term)
     const semesterStart = semester?.startDate || formatDate(new Date())
     const totalWeeks = semester?.weeks || 0
-    const week = requestedWeek || currentWeek(semesterStart)
+    const week = requestedWeek ?? this.teachingWeek(semester)
+    const active = currentSemester(semesters)
+    const currentTeachingWeek = active?.term === semester?.term ? this.teachingWeek(semester) : 0
     const range = weekRange(semesterStart, week)
     const rows = await this.database.query<RowDataPacket[]>(
       'SELECT bid, btime, bname, bperson, bphone, tag, bclassid FROM borrow WHERE btime >= ? AND btime <= ? AND status = 1',
@@ -72,11 +88,20 @@ export class PublicService {
         date: String(row.btime).slice(0, 10),
       }]
     })
-    return { week, totalWeeks, range, busySlots: slots.map((slot) => slot.key), slots }
+    return {
+      week,
+      totalWeeks,
+      currentWeek: currentTeachingWeek,
+      term: semester?.term ?? null,
+      semesterLabel: semester ? semesterLabel(semester) : '',
+      range,
+      busySlots: slots.map((slot) => slot.key),
+      slots,
+    }
   }
 
   async createApplication(body: CreateApplicationDto) {
-    const { semester } = await this.activeSemester()
+    const { semester } = await this.activeSemester(body.semesterTerm)
     const semesterStart = semester?.startDate || formatDate(new Date())
     const groupId = `${Date.now()}${randomUUID().replaceAll('-', '').slice(0, 8)}`
     const dates: string[] = []
