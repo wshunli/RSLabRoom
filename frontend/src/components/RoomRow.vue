@@ -38,6 +38,10 @@ function isSelected(day: number, period: number) {
   return props.selected.some((slot) => slot.room.id === props.room.id && slot.day === day && slot.period === period)
 }
 
+function isToday(day: number) {
+  return day === new Date().getDay()
+}
+
 function roomScheduleLink() {
   return {
     path: `/room/${props.room.id}`,
@@ -59,7 +63,10 @@ function roomScheduleLink() {
     <div class="schedule">
       <div class="schedule-head">
         <span class="period-label">时段</span>
-        <span v-for="day in days" :key="day.date"><b>{{ day.week }}</b><small>{{ day.date }}</small></span>
+        <span v-for="(day, dayIndex) in days" :key="day.date" :class="{ 'current-day': isToday(dayIndex) }">
+          <b class="day-name">{{ day.week }}<i v-if="isToday(dayIndex)" class="current-day-dot" aria-label="今天" /></b>
+          <small>{{ day.date }}</small>
+        </span>
       </div>
       <div v-for="(period, periodIndex) in periods" :key="period" class="schedule-line">
         <span class="period-label">{{ period }}</span>

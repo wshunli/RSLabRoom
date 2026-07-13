@@ -211,3 +211,8 @@ a.room-meta:hover h3{color:var(--green)}
 @media(max-width:800px){.schedule-switches{width:100%;}.semester-switch{flex:1;justify-content:space-between;}.week-switch{width:auto;flex:1;}}
 .week-pop-grid button{width:auto;min-width:40px;padding:0 8px;white-space:nowrap}
 .week-switch>button:disabled{opacity:.4;cursor:not-allowed}
+
+/* 首页周视图：标记今天对应的星期列 */
+.room-row .schedule-head>span.current-day{color:var(--green)}
+.room-row .schedule-head .day-name{position:relative;display:inline-block}
+.room-row .schedule-head .current-day-dot{position:absolute;top:-3px;right:-7px;width:5px;height:5px;border-radius:50%;background:var(--green);box-shadow:0 0 0 3px rgba(13,91,69,.12)}
