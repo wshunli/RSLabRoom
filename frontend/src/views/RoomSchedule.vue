@@ -2,11 +2,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  ArrowLeft, CalendarCheck2, CalendarDays, Clock3, MapPin, Search, Users,
+  ArrowLeft, CalendarCheck2, CalendarDays, ChevronDown, Clock3, MapPin, Search, Users,
 } from '@lucide/vue'
 import BookingDrawer from '../components/BookingDrawer.vue'
 import SlotDetailDialog from '../components/SlotDetailDialog.vue'
-import { api, type AvailabilityResponse } from '../api'
+import { api, type AvailabilityResponse, type SiteConfig } from '../api'
 import { isDayPast, periods, weekdays } from '../data'
 import type { Room, SelectedSlot } from '../types'
 
@@ -27,6 +27,8 @@ const error = ref('')
 const room = ref<Room | null>(null)
 const totalWeeks = ref(0)
 const semesterName = ref('')
+const semesters = ref<SiteConfig['semesters']>([])
+const currentTerm = ref<number | null>(null)
 
 interface WeekSchedule {
   week: number
@@ -49,6 +51,7 @@ const hasMore = computed(() => nextWeek.value <= totalWeeks.value)
 // ---- 预约选择（沿用预约大厅逻辑，跨周时记录每个时段所属教学周） ----
 const selected = ref<SelectedSlot[]>([])
 const drawerOpen = ref(false)
+const submitting = ref(false)
 const submitted = ref(false)
 const lastAppId = ref('')
 const submitError = ref('')
@@ -171,6 +174,7 @@ interface BookingForm {
 
 async function handleSubmit(form: BookingForm) {
   submitError.value = ''
+  submitting.value = true
   const slots = selected.value.map((s) => ({
     roomId: s.room.id,
     week: s.week ?? 1,
@@ -183,6 +187,8 @@ async function handleSubmit(form: BookingForm) {
     submitted.value = true
   } catch (err) {
     submitError.value = err instanceof Error ? err.message : '提交失败，请稍后再试'
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -229,6 +235,8 @@ async function init() {
   nextWeek.value = 1
   try {
     const [config, rooms] = await Promise.all([api.getConfig(), api.getRooms()])
+    semesters.value = config.semesters
+    currentTerm.value = config.currentTerm
     room.value = rooms.find((r) => r.id === roomId.value) ?? null
     if (!room.value) {
       error.value = '未找到该机房'
@@ -249,6 +257,17 @@ async function init() {
   } finally {
     loading.value = false
   }
+}
+
+function onSemesterChange(event: Event) {
+  const term = Number((event.target as HTMLSelectElement).value)
+  if (![1, 2, 3].includes(term) || term === semesterTerm.value) return
+  router.replace({
+    query: {
+      ...route.query,
+      term: String(term),
+    },
+  })
 }
 
 onMounted(() => {
@@ -289,7 +308,19 @@ watch([roomId, semesterTerm], init)
               <span class="dot">·</span>共 {{ totalWeeks }} 周（含假期，已显示 {{ loadedWeeks.length }} 周）
             </p>
           </div>
-          <div class="legend"><span><i class="free" />空闲</span><span><i class="busy" />已占用</span></div>
+          <div class="room-schedule-actions">
+            <label v-if="semesters.length" class="semester-switch">
+              <select
+                :value="semesterTerm ?? currentTerm ?? undefined"
+                aria-label="切换学期"
+                @change="onSemesterChange"
+              >
+                <option v-for="semester in semesters" :key="semester.term" :value="semester.term">第 {{ semester.term }} 学期</option>
+              </select>
+              <ChevronDown :size="14" />
+            </label>
+            <div class="legend"><span><i class="free" />空闲</span><span><i class="busy" />已占用</span></div>
+          </div>
         </div>
 
         <div class="week-schedule-list">
@@ -342,6 +373,7 @@ watch([roomId, semesterTerm], init)
         :values="selected"
         :days="fallbackDays"
         :submitted="submitted"
+        :submitting="submitting"
         :application-id="lastAppId"
         :error="submitError"
         @close="drawerOpen = false"

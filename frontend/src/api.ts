@@ -274,6 +274,10 @@ export const api = {
     `/mail-approval/${encodeURIComponent(token)}/approve`, { method: 'POST' },
   ),
 
+  rejectByMail: (token: string) => request<{ id: string; state: string }>(
+    `/mail-approval/${encodeURIComponent(token)}/reject`, { method: 'POST' },
+  ),
+
   // ---- 用户管理 -------------------------------------------------------------
   getUsers: () => request<ManagedUser[]>('/admin/users'),
 

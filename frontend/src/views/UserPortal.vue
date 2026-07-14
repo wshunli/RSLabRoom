@@ -241,9 +241,11 @@ interface BookingForm {
 }
 
 const submitError = ref('')
+const submitting = ref(false)
 
 async function handleSubmit(form: BookingForm) {
   submitError.value = ''
+  submitting.value = true
   const slots = selected.value.map((slot) => ({
     roomId: slot.room.id,
     week: week.value,
@@ -256,6 +258,8 @@ async function handleSubmit(form: BookingForm) {
     submitted.value = true
   } catch (err) {
     submitError.value = err instanceof Error ? err.message : '提交失败，请稍后再试'
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -272,7 +276,7 @@ function finishBooking() {
       <div>
         <div class="eyebrow"><Sparkles :size="15" /> 让教学空间更好用</div>
         <h1>找到合适的机房，<br><em>现在就能预约。</em></h1>
-        <p>实时查看实验教学中心机房使用情况，在线提交申请，审批进度随时可查。</p>
+        <p>实时查看实验教学中心机房使用情况，在线提交申请。</p>
       </div>
       <div class="hero-stats">
         <div @mouseenter="heroStat[0]?.play()"><span class="stat-icon mint"><DoorOpen /></span><strong><CountUp :ref="(el: any) => (heroStat[0] = el)" :value="roomList.length" /></strong><small>开放机房</small></div>
@@ -364,6 +368,7 @@ function finishBooking() {
       :values="selected"
       :days="days"
       :submitted="submitted"
+      :submitting="submitting"
       :application-id="lastAppId"
       :error="submitError"
       @close="drawerOpen = false"

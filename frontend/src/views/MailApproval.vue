@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { CheckCircle2, MailCheck } from '@lucide/vue'
+import { CheckCircle2, MailCheck, XCircle } from '@lucide/vue'
 import { api } from '../api'
 
 const route = useRoute()
@@ -9,6 +9,7 @@ const token = String(route.params.token || '')
 const application = ref<Awaited<ReturnType<typeof api.getMailApproval>> | null>(null)
 const error = ref('')
 const approving = ref(false)
+const rejecting = ref(false)
 
 onMounted(async () => {
   try { application.value = await api.getMailApproval(token) }
@@ -22,6 +23,15 @@ async function approve() {
     if (application.value) application.value.state = 'approved'
   } catch (err) { error.value = err instanceof Error ? err.message : '审批失败' }
   finally { approving.value = false }
+}
+
+async function reject() {
+  rejecting.value = true
+  try {
+    await api.rejectByMail(token)
+    if (application.value) application.value.state = 'rejected'
+  } catch (err) { error.value = err instanceof Error ? err.message : '驳回失败' }
+  finally { rejecting.value = false }
 }
 </script>
 
@@ -39,7 +49,10 @@ async function approve() {
           <div v-if="application.remarks"><dt>备注</dt><dd>{{ application.remarks }}</dd></div>
         </dl>
         <div v-if="application.state === 'approved'" class="mail-approved"><CheckCircle2 />该申请已通过</div>
-        <button v-else-if="application.state === 'pending'" class="primary mail-approve-button" type="button" :disabled="approving" @click="approve">{{ approving ? '处理中…' : '确认通过申请' }}</button>
+        <div v-else-if="application.state === 'pending'" class="mail-approval-actions">
+          <button class="primary mail-approve-button" type="button" :disabled="approving || rejecting" @click="approve">{{ approving ? '处理中…' : '确认通过申请' }}</button>
+          <button class="reject mail-reject-button" type="button" :disabled="approving || rejecting" @click="reject"><XCircle :size="17" />{{ rejecting ? '处理中…' : '驳回申请' }}</button>
+        </div>
         <p v-else-if="application.state === 'rejected'" class="form-message error">该申请已被驳回，无法通过此链接审批。</p>
         <p v-else class="form-message error">该申请已被删除，无法继续审批。</p>
       </template>

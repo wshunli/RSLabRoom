@@ -527,6 +527,11 @@ export class AdminService {
     return this.approve(id)
   }
 
+  async rejectByMail(token: string) {
+    const id = await this.mailApprovalId(token)
+    return this.reject(id)
+  }
+
   private async mailApprovalId(token: string) {
     try {
       const payload = await this.jwt.verifyAsync<{ sub: string; purpose: string }>(token)

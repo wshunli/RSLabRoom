@@ -5,7 +5,7 @@ const steps = [
   { icon: Search, title: '查找机房', text: '在预约大厅按名称、楼宇或容量筛选合适的机房。' },
   { icon: MousePointerClick, title: '选择时段', text: '点击绿色的空闲时段，打开预约申请表。' },
   { icon: ClipboardCheck, title: '提交申请', text: '填写申请人、联系电话、人数和用途后提交。' },
-  { icon: CalendarCheck2, title: '等待审批', text: '审批通过后，该时段将更新为已占用状态。' },
+  { icon: CalendarCheck2, title: '等待确认', text: '确认通过后，该时段将更新为已占用状态。' },
 ]
 </script>
 
@@ -26,7 +26,7 @@ const steps = [
       </div>
       <aside class="guide-note">
         <ShieldCheck />
-        <div><h2>预约须知</h2><p>请如实填写使用人数与用途；预约结果以管理员审批为准。如需变更或取消，请及时联系实验教学中心。</p></div>
+        <div><h2>预约须知</h2><p>请如实填写使用人数与用途；预约结果以管理员确认为准。如需变更或取消，请及时联系实验教学中心。</p></div>
       </aside>
     </section>
   </main>
