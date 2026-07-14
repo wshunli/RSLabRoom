@@ -11,7 +11,7 @@ import { currentSemester, Semester, semesterLabel, semesterTotalWeeks, sortSemes
 import { SemesterStore } from '../shared/semester-store.service'
 import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateSemestersDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
 
-const STATE_BY_CODE: Record<number, string> = { 0: 'pending', 1: 'approved', 2: 'rejected' }
+const STATE_BY_CODE: Record<number, string> = { 0: 'pending', 1: 'approved', 2: 'rejected', 3: 'deleted' }
 const SCHEDULING_LOCK = 'rslabroom:scheduling'
 
 function userResponse(row: RowDataPacket) {
@@ -57,6 +57,7 @@ export class AdminService {
     if (query.status === 'pending') conditions.push('s.sstatus = 0')
     else if (query.status === 'approved') conditions.push('s.sstatus = 1')
     else if (query.status === 'rejected') conditions.push('s.sstatus = 2')
+    else if (query.status === 'deleted') conditions.push('s.sstatus = 3')
     if (courseName) {
       conditions.push('s.sname LIKE ?')
       params.push(`%${courseName}%`)
@@ -190,6 +191,13 @@ export class AdminService {
 
   async approve(id: string) {
     await this.database.serializedTransaction(SCHEDULING_LOCK, async (connection) => {
+      const [applicationRows] = await connection.execute<RowDataPacket[]>(
+        'SELECT sstatus FROM submit WHERE stimeid = ? FOR UPDATE', [id],
+      )
+      if (!applicationRows.length) throw new NotFoundException({ error: '申请不存在' })
+      if (Number(applicationRows[0].sstatus) !== 0) {
+        throw new ConflictException({ error: '只有待审批申请可以通过' })
+      }
       const [slots] = await connection.execute<RowDataPacket[]>(
         'SELECT btime, bclassid, tag FROM borrow WHERE btimeid = ?', [id],
       )
@@ -222,18 +230,62 @@ export class AdminService {
 
   async reject(id: string) {
     await this.database.transaction(async (connection) => {
+      const [applicationRows] = await connection.execute<RowDataPacket[]>(
+        'SELECT sstatus FROM submit WHERE stimeid = ? FOR UPDATE', [id],
+      )
+      if (!applicationRows.length) throw new NotFoundException({ error: '申请不存在' })
+      if (Number(applicationRows[0].sstatus) !== 0) {
+        throw new ConflictException({ error: '只有待审批申请可以驳回' })
+      }
       await connection.execute('UPDATE borrow SET status = 0 WHERE btimeid = ?', [id])
       await connection.execute('UPDATE submit SET sstatus = 2 WHERE stimeid = ?', [id])
     })
     return { id, state: 'rejected' }
   }
 
+  async revokeApproval(id: string) {
+    await this.database.serializedTransaction(SCHEDULING_LOCK, async (connection) => {
+      const [applicationRows] = await connection.execute<RowDataPacket[]>(
+        'SELECT sstatus FROM submit WHERE stimeid = ? FOR UPDATE', [id],
+      )
+      if (!applicationRows.length) throw new NotFoundException({ error: '申请不存在' })
+      if (Number(applicationRows[0].sstatus) !== 1) {
+        throw new ConflictException({ error: '只有已通过申请可以撤销通过' })
+      }
+      await connection.execute('UPDATE borrow SET status = 0 WHERE btimeid = ?', [id])
+      await connection.execute('UPDATE submit SET sstatus = 0 WHERE stimeid = ?', [id])
+    })
+    return { id, state: 'pending' }
+  }
+
+  async restore(id: string) {
+    await this.database.transaction(async (connection) => {
+      const [applicationRows] = await connection.execute<RowDataPacket[]>(
+        'SELECT sstatus FROM submit WHERE stimeid = ? FOR UPDATE', [id],
+      )
+      if (!applicationRows.length) throw new NotFoundException({ error: '申请不存在' })
+      if (![2, 3].includes(Number(applicationRows[0].sstatus))) {
+        throw new ConflictException({ error: '只有已驳回或已删除申请可以撤销' })
+      }
+      await connection.execute('UPDATE borrow SET status = 0 WHERE btimeid = ?', [id])
+      await connection.execute('UPDATE submit SET sstatus = 0 WHERE stimeid = ?', [id])
+    })
+    return { id, state: 'pending' }
+  }
+
   async deleteApplication(id: string) {
     await this.database.serializedTransaction(SCHEDULING_LOCK, async (connection) => {
-      await connection.execute('DELETE FROM borrow WHERE btimeid = ?', [id])
-      await connection.execute('DELETE FROM submit WHERE stimeid = ?', [id])
+      const [applicationRows] = await connection.execute<RowDataPacket[]>(
+        'SELECT sstatus FROM submit WHERE stimeid = ? FOR UPDATE', [id],
+      )
+      if (!applicationRows.length) throw new NotFoundException({ error: '申请不存在' })
+      if (Number(applicationRows[0].sstatus) === 3) {
+        throw new ConflictException({ error: '申请已是已删除状态' })
+      }
+      await connection.execute('UPDATE borrow SET status = 0 WHERE btimeid = ?', [id])
+      await connection.execute('UPDATE submit SET sstatus = 3 WHERE stimeid = ?', [id])
     })
-    return { id, deleted: true }
+    return { id, deleted: true, state: 'deleted' }
   }
 
   async getSemesters() {

@@ -40,7 +40,8 @@ async function approve() {
         </dl>
         <div v-if="application.state === 'approved'" class="mail-approved"><CheckCircle2 />该申请已通过</div>
         <button v-else-if="application.state === 'pending'" class="primary mail-approve-button" type="button" :disabled="approving" @click="approve">{{ approving ? '处理中…' : '确认通过申请' }}</button>
-        <p v-else class="form-message error">该申请已被驳回，无法通过此链接审批。</p>
+        <p v-else-if="application.state === 'rejected'" class="form-message error">该申请已被驳回，无法通过此链接审批。</p>
+        <p v-else class="form-message error">该申请已被删除，无法继续审批。</p>
       </template>
       <p v-else>正在加载申请信息…</p>
     </section>

@@ -1,5 +1,5 @@
 export type PortalMode = 'user' | 'guide' | 'admin'
-export type RequestState = 'pending' | 'approved' | 'rejected'
+export type RequestState = 'pending' | 'approved' | 'rejected' | 'deleted'
 
 export interface AdminUser {
   username: string

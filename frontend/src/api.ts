@@ -155,7 +155,7 @@ export const api = {
 
   // ---- 申请审批（分页 + 多条件筛选） ----------------------------------------
   getApplications: (
-    status: 'pending' | 'approved' | 'rejected' | 'all' = 'all',
+    status: 'pending' | 'approved' | 'rejected' | 'deleted' | 'all' = 'all',
     page = 1,
     pageSize = 15,
     filters: { date?: string; courseName?: string; teacher?: string } = {},
@@ -180,8 +180,14 @@ export const api = {
   approveApplication: (id: string) =>
     request<{ id: string; state: string }>(`/admin/applications/${id}/approve`, { method: 'POST' }),
 
+  revokeApproval: (id: string) =>
+    request<{ id: string; state: string }>(`/admin/applications/${id}/revoke-approval`, { method: 'POST' }),
+
   rejectApplication: (id: string) =>
     request<{ id: string; state: string }>(`/admin/applications/${id}/reject`, { method: 'POST' }),
+
+  restoreApplication: (id: string) =>
+    request<{ id: string; state: string }>(`/admin/applications/${id}/restore`, { method: 'POST' }),
 
   deleteApplication: (id: string) =>
     request<{ id: string; deleted: boolean }>(`/admin/applications/${id}`, { method: 'DELETE' }),
@@ -240,7 +246,7 @@ export const api = {
 
   getMailApproval: (token: string) => request<{
     id: string; applicant: string; phone: string; people: number; courseName: string
-    remarks: string; state: 'pending' | 'approved' | 'rejected'; detailList: string[]
+    remarks: string; state: 'pending' | 'approved' | 'rejected' | 'deleted'; detailList: string[]
   }>(`/mail-approval/${encodeURIComponent(token)}`),
 
   approveByMail: (token: string) => request<{ id: string; state: string }>(

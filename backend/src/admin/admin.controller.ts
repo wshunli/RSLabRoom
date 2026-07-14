@@ -17,8 +17,14 @@ export class AdminController {
   @Post('applications/:id/approve')
   approve(@Param('id') id: string) { return this.service.approve(id) }
 
+  @Post('applications/:id/revoke-approval')
+  revokeApproval(@Param('id') id: string) { return this.service.revokeApproval(id) }
+
   @Post('applications/:id/reject')
   reject(@Param('id') id: string) { return this.service.reject(id) }
+
+  @Post('applications/:id/restore')
+  restore(@Param('id') id: string) { return this.service.restore(id) }
 
   @Delete('applications/:id')
   deleteApplication(@Param('id') id: string) { return this.service.deleteApplication(id) }

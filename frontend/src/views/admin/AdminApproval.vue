@@ -27,7 +27,7 @@ type ApprovalRequest = BookingRequest & { detailList: string[] }
 const requests = ref<ApprovalRequest[]>([])
 const selectedRequest = ref<ApprovalRequest | null>(null)
 
-type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected'
+type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected' | 'deleted'
 const appStatus = ref<StatusFilter>('all')
 const appPage = ref(1)
 const appPageSize = ref(15)
@@ -46,11 +46,13 @@ const statusOptions: { value: StatusFilter; label: string }[] = [
   { value: 'pending', label: '待审批' },
   { value: 'approved', label: '已通过' },
   { value: 'rejected', label: '已驳回' },
+  { value: 'deleted', label: '已删除' },
 ]
 const statusLabels: Record<RequestState, string> = {
   pending: '待审批',
   approved: '已通过',
   rejected: '已驳回',
+  deleted: '已删除',
 }
 
 const totalPages = computed(() => Math.max(1, Math.ceil(appTotal.value / appPageSize.value)))
@@ -155,13 +157,24 @@ async function updateRequest(id: string, state: RequestState) {
   try {
     if (state === 'approved') await api.approveApplication(id)
     else if (state === 'rejected') await api.rejectApplication(id)
+    else if (state === 'pending') await api.restoreApplication(id)
     await loadApplications()
   } catch (err) {
     alert(err instanceof Error ? err.message : '操作失败')
   }
 }
 
+async function revokeApproval(id: string) {
+  try {
+    await api.revokeApproval(id)
+    await loadApplications()
+  } catch (err) {
+    alert(err instanceof Error ? err.message : '撤销通过失败')
+  }
+}
+
 async function deleteRequest(id: string) {
+  if (!confirm('确定将该申请标记为“已删除”吗？之后可撤销删除并恢复为待审批。')) return
   try {
     await api.deleteApplication(id)
     if (requests.value.length === 1 && appPage.value > 1) appPage.value -= 1
@@ -239,8 +252,10 @@ onMounted(() => {
                 <div class="approval-actions">
                   <button class="view-detail" title="查看详情" @click="showDetail(request)"><Eye />详情</button>
                   <button v-if="request.state === 'pending'" class="approve" title="通过" @click="updateRequest(request.id, 'approved')"><Check />通过</button>
-                  <button v-if="request.state !== 'rejected'" class="reject" title="驳回" @click="updateRequest(request.id, 'rejected')"><X />驳回</button>
-                  <button class="delete" title="删除" @click="deleteRequest(request.id)"><Trash2 />删除</button>
+                  <button v-if="request.state === 'pending'" class="reject" title="驳回" @click="updateRequest(request.id, 'rejected')"><X />驳回</button>
+                  <button v-if="request.state === 'approved'" class="approve" title="撤销通过" @click="revokeApproval(request.id)"><RotateCcw />撤销通过</button>
+                  <button v-if="request.state === 'rejected' || request.state === 'deleted'" class="restore" :title="request.state === 'deleted' ? '撤销删除' : '撤销驳回'" @click="updateRequest(request.id, 'pending')"><RotateCcw />{{ request.state === 'deleted' ? '撤销删除' : '撤销驳回' }}</button>
+                  <button v-if="request.state !== 'deleted'" class="delete" title="标记删除" @click="deleteRequest(request.id)"><Trash2 />删除</button>
                 </div>
               </td>
             </tr>
@@ -301,8 +316,10 @@ onMounted(() => {
           <span class="status" :class="selectedRequest.state">{{ statusLabels[selectedRequest.state] }}</span>
           <div class="approval-actions">
             <button v-if="selectedRequest.state === 'pending'" class="approve" title="通过" @click="updateRequest(selectedRequest.id, 'approved'); closeDetail()"><Check />通过</button>
-            <button v-if="selectedRequest.state !== 'rejected'" class="reject" title="驳回" @click="updateRequest(selectedRequest.id, 'rejected'); closeDetail()"><X />驳回</button>
-            <button class="delete" title="删除" @click="deleteRequest(selectedRequest.id); closeDetail()"><Trash2 />删除</button>
+            <button v-if="selectedRequest.state === 'pending'" class="reject" title="驳回" @click="updateRequest(selectedRequest.id, 'rejected'); closeDetail()"><X />驳回</button>
+            <button v-if="selectedRequest.state === 'approved'" class="approve" title="撤销通过" @click="revokeApproval(selectedRequest.id); closeDetail()"><RotateCcw />撤销通过</button>
+            <button v-if="selectedRequest.state === 'rejected' || selectedRequest.state === 'deleted'" class="restore" :title="selectedRequest.state === 'deleted' ? '撤销删除' : '撤销驳回'" @click="updateRequest(selectedRequest.id, 'pending'); closeDetail()"><RotateCcw />{{ selectedRequest.state === 'deleted' ? '撤销删除' : '撤销驳回' }}</button>
+            <button v-if="selectedRequest.state !== 'deleted'" class="delete" title="标记删除" @click="deleteRequest(selectedRequest.id); closeDetail()"><Trash2 />删除</button>
           </div>
         </div>
       </div>
