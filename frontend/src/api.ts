@@ -66,6 +66,7 @@ export interface SiteConfig {
 export interface AvailabilitySlot {
   key: string
   bid: number
+  applicationId: string
   roomId: number
   day: number
   period: number
@@ -125,6 +126,12 @@ export const api = {
     const query = params.toString()
     return request<AvailabilityResponse>(`/availability${query ? `?${query}` : ''}`)
   },
+
+  getPublicApplication: (id: string) => request<{
+    id: string; applicant: string; phone: string; people: number; courseName: string
+    requiredSoftware: string; remarks: string; state: 'pending' | 'approved' | 'rejected' | 'deleted'
+    slotList: Array<{ bid: number; label: string; state: 'pending' | 'approved' | 'rejected' | 'deleted' }>
+  }>(`/applications/${encodeURIComponent(id)}`),
 
   // ---- 提交申请 -------------------------------------------------------------
   submitApplication: (payload: {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, ParseIntPipe, Post, Query } from '@nestjs/common'
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query } from '@nestjs/common'
 import { CreateApplicationDto } from './public.dto'
 import { PublicService } from './public.service'
 
@@ -23,5 +23,10 @@ export class PublicController {
   @Post('applications')
   createApplication(@Body() body: CreateApplicationDto) {
     return this.service.createApplication(body)
+  }
+
+  @Get('applications/:id')
+  getApplication(@Param('id') id: string) {
+    return this.service.getApplication(id)
   }
 }

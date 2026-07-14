@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { Injectable } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { RowDataPacket } from 'mysql2'
 import { DatabaseService } from '../database/database.service'
 import { MailService } from '../mail/mail.service'
 import { rowToRoom } from '../shared/rooms'
-import { currentWeek, dayIndexOf, formatDate, periodToTag, slotDate, weekRange } from '../shared/time'
+import { currentWeek, dayIndexOf, formatDate, PERIOD_NAMES, periodToTag, slotDate, weekRange } from '../shared/time'
 import { currentSemester, isVacationWeek, Semester, semesterLabel, semesterTotalWeeks, semesterWeekLabel, vacationLabel } from '../shared/semesters'
 import { SemesterStore } from '../shared/semester-store.service'
 import { CreateApplicationDto } from './public.dto'
@@ -75,7 +75,7 @@ export class PublicService {
     const currentTeachingWeek = active?.term === semester?.term ? this.teachingWeek(semester) : 0
     const range = weekRange(semesterStart, week)
     const rows = await this.database.query<RowDataPacket[]>(
-      'SELECT bid, btime, bname, bperson, bphone, tag, bclassid FROM borrow WHERE btime >= ? AND btime <= ? AND status = 1',
+      'SELECT bid, btimeid, btime, bname, bperson, bphone, tag, bclassid FROM borrow WHERE btime >= ? AND btime <= ? AND status = 1',
       [range.start, range.end],
     )
     const slots = rows.flatMap((row) => {
@@ -85,6 +85,7 @@ export class PublicService {
       return [{
         key: `${row.bclassid}-${day}-${period}`,
         bid: row.bid,
+        applicationId: String(row.btimeid),
         roomId: row.bclassid,
         day,
         period,
@@ -107,6 +108,38 @@ export class PublicService {
       range,
       busySlots: slots.map((slot) => slot.key),
       slots,
+    }
+  }
+
+  async getApplication(id: string) {
+    const row = await this.database.queryOne<RowDataPacket>(
+      'SELECT stimeid, sperson, sphone, ssoftware, snumer, sname, smore, sstatus FROM submit WHERE stimeid = ?', [id],
+    )
+    if (!row) throw new NotFoundException({ error: '申请不存在' })
+    const rows = await this.database.query<RowDataPacket[]>(
+      `SELECT b.bid, b.btime, b.tag, b.bclassid, b.status, c.cname
+         FROM borrow b LEFT JOIN class c ON b.bclassid = c.cid
+        WHERE b.btimeid = ? ORDER BY b.btime, b.tag`, [id],
+    )
+    const stateByCode: Record<number, string> = { 0: 'pending', 1: 'approved', 2: 'rejected', 3: 'deleted' }
+    const slotList = rows.map((slot) => {
+      const room = rowToRoom({ cid: slot.bclassid, cname: slot.cname || '', cintro: '' })
+      return {
+        bid: Number(slot.bid),
+        label: `${room.name || `机房${slot.bclassid}`} · ${String(slot.btime).slice(0, 10)} · ${PERIOD_NAMES[Number(slot.tag) - 1] || ''}`,
+        state: stateByCode[Number(slot.status)] || 'pending',
+      }
+    })
+    return {
+      id: String(row.stimeid),
+      applicant: row.sperson,
+      phone: row.sphone,
+      people: Number(row.snumer) || 0,
+      courseName: row.sname,
+      requiredSoftware: row.ssoftware,
+      remarks: row.smore,
+      state: stateByCode[Number(row.sstatus)] || 'pending',
+      slotList,
     }
   }
 

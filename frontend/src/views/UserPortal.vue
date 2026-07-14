@@ -27,7 +27,7 @@ const loading = ref(true)
 const error = ref('')
 const roomList = ref<Room[]>([])
 const busySlots = ref<Set<string>>(new Set())
-const slotInfo = ref<Map<string, { courseName: string; teacher: string; phone: string; date: string }>>(new Map())
+const slotInfo = ref<Map<string, { applicationId: string; courseName: string; teacher: string; phone: string; date: string }>>(new Map())
 const week = ref(1)
 const totalWeeks = ref(0)
 const teachingWeeks = ref(0)
@@ -113,10 +113,10 @@ async function loadAvailability(target?: number, term = selectedTerm.value ?? un
   rangeStart.value = data.range.start
   rangeEnd.value = data.range.end
   const busy = new Set<string>()
-  const info = new Map<string, { courseName: string; teacher: string; phone: string; date: string }>()
+  const info = new Map<string, { applicationId: string; courseName: string; teacher: string; phone: string; date: string }>()
   for (const slot of data.slots) {
     busy.add(slot.key)
-    info.set(slot.key, { courseName: slot.courseName, teacher: slot.teacher, phone: slot.phone, date: slot.date })
+    info.set(slot.key, { applicationId: slot.applicationId, courseName: slot.courseName, teacher: slot.teacher, phone: slot.phone, date: slot.date })
   }
   busySlots.value = busy
   slotInfo.value = info
@@ -198,6 +198,7 @@ function toggleSlot(room: SelectedSlot['room'], day: number, period: number) {
 }
 
 interface SlotDetail {
+  applicationId: string
   roomName: string
   building: string
   courseName: string
@@ -216,6 +217,7 @@ function openDetail(room: Room, day: number, period: number) {
   const info = slotInfo.value.get(`${room.id}-${day}-${period}`)
   if (!info) return
   slotDetail.value = {
+    applicationId: info.applicationId,
     roomName: room.name,
     building: room.building,
     courseName: info.courseName,

@@ -158,6 +158,7 @@
 
 .room-time-note{margin:16px 0 0;text-align:right;color:#6f7d77;font-size:12px;line-height:1.7}
 @media(max-width:800px){.room-time-note{text-align:left;font-size:12px}}
+.slot-detail-loading,.slot-detail-error{color:var(--muted);padding:26px 0 8px;font-size:13px}.slot-detail-error{color:#a64231}.guest-slot-row{grid-template-columns:minmax(0,1fr) auto}
 .mobile-login,.mobile-session{display:none}
 @media(max-width:800px){
   .topbar .top-actions{display:none}
