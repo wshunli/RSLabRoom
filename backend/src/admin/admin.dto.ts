@@ -26,6 +26,26 @@ export class SlotStateDto {
   state: 'pending' | 'approved' | 'rejected' | 'deleted'
 }
 
+export class UpdateApplicationDto {
+  @IsString() @IsNotEmpty() @MaxLength(10)
+  applicantName: string
+
+  @IsString() @IsNotEmpty() @MaxLength(25)
+  phone: string
+
+  @Type(() => Number) @IsInt() @Min(1) @Max(9999)
+  attendees: number
+
+  @IsString() @IsNotEmpty() @MaxLength(50)
+  courseName: string
+
+  @IsString() @MaxLength(200)
+  requiredSoftware = ''
+
+  @IsString() @MaxLength(200)
+  remarks = ''
+}
+
 // 学期配置：一个学年固定包含第一、二、三学期，每学期可配置教学周数及结束后的假期周数。
 export class SemesterDto {
   @Type(() => Number) @IsInt() @Min(1) @Max(3)

@@ -10,7 +10,7 @@ import { rowToRoom } from '../shared/rooms'
 import { formatDate, parseDate, PERIOD_HOURS, PERIOD_NAMES, periodToTag, slotDate } from '../shared/time'
 import { currentSemester, Semester, semesterLabel, semesterTotalWeeks, sortSemesters } from '../shared/semesters'
 import { SemesterStore } from '../shared/semester-store.service'
-import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, SlotStateDto, UpdateSemestersDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
+import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, SlotStateDto, UpdateApplicationDto, UpdateSemestersDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
 
 const STATE_BY_CODE: Record<number, string> = { 0: 'pending', 1: 'approved', 2: 'rejected', 3: 'deleted' }
 const SCHEDULING_LOCK = 'rslabroom:scheduling'
@@ -111,6 +111,51 @@ export class AdminService {
     }))
     const pending = await this.database.queryOne<RowDataPacket>('SELECT COUNT(*) AS total FROM submit WHERE sstatus = 0')
     return { items, total, page: query.page, pageSize: query.pageSize, pendingTotal: Number(pending?.total || 0) }
+  }
+
+  async getApplicationFilters() {
+    const semesters = await this.semesterStore.list()
+    const active = currentSemester(semesters)
+    const now = new Date()
+    const fallbackStartYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1
+    const startYear = active?.startYear ?? fallbackStartYear
+    const academicSemesters = sortSemesters(semesters.filter((semester) => semester.startYear === startYear))
+    const firstSemester = academicSemesters.find((semester) => semester.term === 1)
+    const thirdSemester = academicSemesters.find((semester) => semester.term === 3)
+
+    // 候选项的范围严格跟随学期配置：第一学期开学日开始，到第三学期最后一个暑假周结束。
+    if (!firstSemester || !thirdSemester) {
+      return { startYear, teachers: [], courses: [] }
+    }
+    const startDate = firstSemester.startDate
+    const end = parseDate(thirdSemester.startDate)
+    end.setDate(end.getDate() + semesterTotalWeeks(thirdSemester) * 7)
+    // btime 是 timestamp，结束日期使用开区间，覆盖最后一个暑假周的全天数据。
+    const endDate = formatDate(end)
+    const range = [startDate, endDate]
+
+    const [teacherRows, courseRows] = await Promise.all([
+      this.database.query<RowDataPacket[]>(
+        `SELECT DISTINCT TRIM(bperson) AS value
+           FROM borrow
+          WHERE btime >= ? AND btime < ? AND TRIM(bperson) <> ''
+          ORDER BY value`,
+        range,
+      ),
+      this.database.query<RowDataPacket[]>(
+        `SELECT DISTINCT TRIM(bname) AS value
+           FROM borrow
+          WHERE btime >= ? AND btime < ? AND TRIM(bname) <> ''
+          ORDER BY value`,
+        range,
+      ),
+    ])
+
+    return {
+      startYear,
+      teachers: teacherRows.map((row) => String(row.value)),
+      courses: courseRows.map((row) => String(row.value)),
+    }
   }
 
   // 概览统计：本周 / 本月 / 今日 的排课次数与课时，以及亮点数据和今日占用明细。
@@ -299,6 +344,29 @@ export class AdminService {
       await connection.execute('UPDATE submit SET sstatus = 3 WHERE stimeid = ?', [id])
     })
     return { id, deleted: true, state: 'deleted' }
+  }
+
+  async updateApplication(id: string, body: UpdateApplicationDto) {
+    await this.database.transaction(async (connection) => {
+      const [rows] = await connection.execute<RowDataPacket[]>(
+        'SELECT stimeid FROM submit WHERE stimeid = ? FOR UPDATE', [id],
+      )
+      if (!rows.length) throw new NotFoundException({ error: '申请不存在' })
+      await connection.execute(
+        `UPDATE submit
+            SET sperson = ?, sphone = ?, snumer = ?, ssoftware = ?, sname = ?, smore = ?
+          WHERE stimeid = ?`,
+        [body.applicantName, body.phone, String(body.attendees), body.requiredSoftware, body.courseName, body.remarks, id],
+      )
+      await connection.execute(
+        `UPDATE borrow
+            SET bperson = ?, bphone = ?, bnumer = ?, bsoftware = ?, bname = ?, bmore = ?
+          WHERE btimeid = ?`,
+        [body.applicantName, body.phone, String(body.attendees), body.requiredSoftware, body.courseName, body.remarks, id],
+      )
+    })
+    return { id, applicant: body.applicantName, phone: body.phone, people: body.attendees,
+      courseName: body.courseName, requiredSoftware: body.requiredSoftware, remarks: body.remarks }
   }
 
   private async syncApplicationState(connection: PoolConnection, id: string) {

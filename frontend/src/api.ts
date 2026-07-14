@@ -177,6 +177,9 @@ export const api = {
     }>(`/admin/applications?${params.toString()}`)
   },
 
+  getApplicationFilters: () =>
+    request<{ startYear: number; teachers: string[]; courses: string[] }>('/admin/application-filters'),
+
   approveApplication: (id: string) =>
     request<{ id: string; state: string }>(`/admin/applications/${id}/approve`, { method: 'POST' }),
 
@@ -191,6 +194,12 @@ export const api = {
 
   deleteApplication: (id: string) =>
     request<{ id: string; deleted: boolean }>(`/admin/applications/${id}`, { method: 'DELETE' }),
+
+  updateApplication: (id: string, payload: {
+    applicantName: string; phone: string; attendees: number; courseName: string; requiredSoftware: string; remarks: string
+  }) => request<{ id: string; applicant: string; phone: string; people: number; courseName: string; requiredSoftware: string; remarks: string }>(
+    `/admin/applications/${id}`, { method: 'PUT', body: JSON.stringify(payload) },
+  ),
 
   updateApplicationSlot: (id: string, bid: number, state: 'pending' | 'approved' | 'rejected' | 'deleted') =>
     request<{ id: string; bid: number; state: string }>(`/admin/applications/${id}/slots/${bid}/state`, {

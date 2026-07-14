@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query, UseGuards } from '@nestjs/common'
 import { AuthGuard } from '../auth/auth.guard'
 import { AdminService } from './admin.service'
-import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, SlotStateDto, UpdateSemestersDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
+import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, SlotStateDto, UpdateApplicationDto, UpdateSemestersDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
 
 @Controller('api/admin')
 @UseGuards(AuthGuard)
@@ -13,6 +13,9 @@ export class AdminController {
 
   @Get('applications')
   getApplications(@Query() query: ApplicationQueryDto) { return this.service.getApplications(query) }
+
+  @Get('application-filters')
+  getApplicationFilters() { return this.service.getApplicationFilters() }
 
   @Post('applications/:id/approve')
   approve(@Param('id') id: string) { return this.service.approve(id) }
@@ -28,6 +31,11 @@ export class AdminController {
 
   @Delete('applications/:id')
   deleteApplication(@Param('id') id: string) { return this.service.deleteApplication(id) }
+
+  @Put('applications/:id')
+  updateApplication(@Param('id') id: string, @Body() body: UpdateApplicationDto) {
+    return this.service.updateApplication(id, body)
+  }
 
   @Put('applications/:id/slots/:bid/state')
   updateApplicationSlot(@Param('id') id: string, @Param('bid') bid: string, @Body() body: SlotStateDto) {

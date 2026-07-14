@@ -10,6 +10,7 @@ import {
   Eye,
   FileText,
   Monitor,
+  Pencil,
   Phone,
   RotateCcw,
   Search,
@@ -28,6 +29,9 @@ type ApprovalRequest = BookingRequest & { detailList: string[]; slotList: Approv
 
 const requests = ref<ApprovalRequest[]>([])
 const selectedRequest = ref<ApprovalRequest | null>(null)
+const editing = ref(false)
+const savingEdit = ref(false)
+const editForm = ref({ applicant: '', phone: '', courseName: '', requiredSoftware: '', people: 1, remarks: '' })
 
 type StatusFilter = 'all' | 'pending' | 'approved' | 'rejected' | 'deleted'
 const appStatus = ref<StatusFilter>('all')
@@ -37,6 +41,7 @@ const appTotal = ref(0)
 const appLoading = ref(false)
 const appError = ref('')
 const jumpPage = ref('')
+const applicationFilters = ref<{ teachers: string[]; courses: string[] }>({ teachers: [], courses: [] })
 const filters = ref({
   date: '',
   courseName: '',
@@ -106,6 +111,16 @@ async function loadApplications() {
     adminStore.pendingTotal = 0
   } finally {
     appLoading.value = false
+  }
+}
+
+async function loadApplicationFilters() {
+  try {
+    const res = await api.getApplicationFilters()
+    applicationFilters.value = { teachers: res.teachers || [], courses: res.courses || [] }
+  } catch {
+    // 候选项加载失败不影响手动输入和模糊查询。
+    applicationFilters.value = { teachers: [], courses: [] }
   }
 }
 
@@ -188,10 +203,67 @@ async function deleteRequest(id: string) {
 
 function showDetail(request: ApprovalRequest) {
   selectedRequest.value = request
+  editing.value = false
+  editForm.value = {
+    applicant: request.applicant,
+    phone: request.phone,
+    courseName: request.courseName,
+    requiredSoftware: request.requiredSoftware,
+    people: request.people,
+    remarks: request.remarks,
+  }
 }
 
 function closeDetail() {
   selectedRequest.value = null
+  editing.value = false
+}
+
+function startEditing() {
+  if (!selectedRequest.value) return
+  editForm.value = {
+    applicant: selectedRequest.value.applicant,
+    phone: selectedRequest.value.phone,
+    courseName: selectedRequest.value.courseName,
+    requiredSoftware: selectedRequest.value.requiredSoftware,
+    people: selectedRequest.value.people,
+    remarks: selectedRequest.value.remarks,
+  }
+  editing.value = true
+}
+
+function cancelEditing() {
+  editing.value = false
+}
+
+async function saveEditing() {
+  if (!selectedRequest.value) return
+  savingEdit.value = true
+  try {
+    await api.updateApplication(selectedRequest.value.id, {
+      applicantName: editForm.value.applicant,
+      phone: editForm.value.phone,
+      attendees: editForm.value.people,
+      courseName: editForm.value.courseName,
+      requiredSoftware: editForm.value.requiredSoftware,
+      remarks: editForm.value.remarks,
+    })
+    selectedRequest.value = {
+      ...selectedRequest.value,
+      applicant: editForm.value.applicant,
+      phone: editForm.value.phone,
+      people: editForm.value.people,
+      courseName: editForm.value.courseName,
+      requiredSoftware: editForm.value.requiredSoftware,
+      remarks: editForm.value.remarks,
+    }
+    editing.value = false
+    await loadApplications()
+  } catch (err) {
+    alert(err instanceof Error ? err.message : '保存申请信息失败')
+  } finally {
+    savingEdit.value = false
+  }
 }
 
 async function updateSlot(slot: ApprovalSlot, state: SlotState) {
@@ -219,6 +291,7 @@ async function updateSlot(slot: ApprovalSlot, state: SlotState) {
 
 onMounted(() => {
   loadApplications()
+  loadApplicationFilters()
 })
 </script>
 
@@ -247,11 +320,17 @@ onMounted(() => {
         </label>
         <label>
           <span>按课程名称查询</span>
-          <input v-model.trim="filters.courseName" maxlength="50" placeholder="输入课程名称">
+          <input v-model.trim="filters.courseName" list="approval-course-options" maxlength="50" placeholder="输入或选择课程">
+          <datalist id="approval-course-options">
+            <option v-for="course in applicationFilters.courses" :key="course" :value="course" />
+          </datalist>
         </label>
         <label>
           <span>按任课老师查询</span>
-          <input v-model.trim="filters.teacher" maxlength="20" placeholder="输入任课老师">
+          <input v-model.trim="filters.teacher" list="approval-teacher-options" maxlength="20" placeholder="输入或选择老师">
+          <datalist id="approval-teacher-options">
+            <option v-for="teacher in applicationFilters.teachers" :key="teacher" :value="teacher" />
+          </datalist>
         </label>
         <button class="filter-action primary-filter" type="submit" title="查询"><Search :size="15" />查询</button>
         <button class="filter-action reset-filter" type="button" title="重置" @click="resetFilters"><RotateCcw :size="15" />重置</button>
@@ -320,15 +399,20 @@ onMounted(() => {
       <div class="approval-detail-dialog">
         <div class="slot-detail-head">
           <div><span class="kicker">REQUEST DETAIL</span><h3>{{ selectedRequest.courseName || '申请详情' }}</h3></div>
-          <button class="icon-btn" aria-label="关闭" @click="closeDetail"><X /></button>
+          <div class="approval-detail-head-actions">
+            <button v-if="!editing" class="detail-edit-btn" type="button" @click="startEditing"><Pencil :size="14" />编辑</button>
+            <button v-else class="detail-edit-btn save" type="button" :disabled="savingEdit" @click="saveEditing">{{ savingEdit ? '保存中…' : '保存' }}</button>
+            <button v-if="editing" class="detail-edit-btn cancel" type="button" @click="cancelEditing">取消</button>
+            <button class="icon-btn" aria-label="关闭" @click="closeDetail"><X /></button>
+          </div>
         </div>
         <ul class="approval-detail-list">
-          <li><UserRound :size="16" /><span>申请人</span><strong>{{ selectedRequest.applicant }}</strong></li>
-          <li><Phone :size="16" /><span>联系电话</span><strong>{{ selectedRequest.phone || '—' }}</strong></li>
-          <li><BookOpen :size="16" /><span>课程名称</span><strong>{{ selectedRequest.courseName || '—' }}</strong></li>
-          <li><Monitor :size="16" /><span>需要软件</span><strong>{{ selectedRequest.requiredSoftware || '—' }}</strong></li>
-          <li><Users :size="16" /><span>学生人数</span><strong>{{ selectedRequest.people }}</strong></li>
-          <li><FileText :size="16" /><span>备注</span><strong>{{ selectedRequest.remarks || '—' }}</strong></li>
+          <li><UserRound :size="16" /><span>申请人</span><input v-if="editing" v-model.trim="editForm.applicant" maxlength="10" required><strong v-else>{{ selectedRequest.applicant }}</strong></li>
+          <li><Phone :size="16" /><span>联系电话</span><input v-if="editing" v-model.trim="editForm.phone" maxlength="25" required><strong v-else>{{ selectedRequest.phone || '—' }}</strong></li>
+          <li><BookOpen :size="16" /><span>课程名称</span><input v-if="editing" v-model.trim="editForm.courseName" maxlength="50" required><strong v-else>{{ selectedRequest.courseName || '—' }}</strong></li>
+          <li><Monitor :size="16" /><span>需要软件</span><input v-if="editing" v-model.trim="editForm.requiredSoftware" maxlength="200"><strong v-else>{{ selectedRequest.requiredSoftware || '—' }}</strong></li>
+          <li><Users :size="16" /><span>学生人数</span><input v-if="editing" v-model.number="editForm.people" type="number" min="1" max="9999" required><strong v-else>{{ selectedRequest.people }}</strong></li>
+          <li><FileText :size="16" /><span>备注</span><input v-if="editing" v-model.trim="editForm.remarks" maxlength="200"><strong v-else>{{ selectedRequest.remarks || '—' }}</strong></li>
         </ul>
           <div class="approval-slot-section">
           <div class="approval-slot-title"><Clock3 :size="16" /><span>预约时段</span></div>
