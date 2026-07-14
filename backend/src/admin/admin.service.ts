@@ -69,6 +69,7 @@ export class AdminService {
     else if (query.status === 'approved') conditions.push('s.sstatus = 1')
     else if (query.status === 'rejected') conditions.push('s.sstatus = 2')
     else if (query.status === 'deleted') conditions.push('s.sstatus = 3')
+    else conditions.push('s.sstatus <> 3')
     if (courseName) {
       conditions.push('s.sname LIKE ?')
       params.push(`%${courseName}%`)
@@ -280,7 +281,7 @@ export class AdminService {
           })
         }
       }
-      await connection.execute('UPDATE borrow SET status = 1 WHERE btimeid = ? AND status = 0', [id])
+      await connection.execute('UPDATE borrow SET status = 1 WHERE btimeid = ?', [id])
       await this.syncApplicationState(connection, id)
     })
     return { id, state: 'approved' }
@@ -295,7 +296,7 @@ export class AdminService {
       if (Number(applicationRows[0].sstatus) !== 0) {
         throw new ConflictException({ error: '只有待审批申请可以驳回' })
       }
-      await connection.execute('UPDATE borrow SET status = 2 WHERE btimeid = ? AND status = 0', [id])
+      await connection.execute('UPDATE borrow SET status = 2 WHERE btimeid = ?', [id])
       await this.syncApplicationState(connection, id)
     })
     return { id, state: 'rejected' }
