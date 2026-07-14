@@ -48,11 +48,12 @@ watch(
 <template>
   <header class="topbar">
     <div class="brand-mark"><Building2 :size="24" /></div>
-    <div class="brand-copy"><strong>实验教学中心</strong><span>机房预约与管理平台</span></div>
+    <div class="brand-copy"><strong>机房预约与管理系统</strong><span>武汉大学遥感信息工程学院实验教学中心</span></div>
     <nav :class="{ open: mobileNav }">
       <button :class="{ active: currentMode === 'user' }" @click="navigateTo('user')">预约大厅</button>
       <button :class="{ active: currentMode === 'guide' }" @click="navigateTo('guide')">使用指南</button>
       <button v-if="admin" :class="{ active: currentMode === 'admin' }" @click="navigateTo('admin-approval')">管理后台</button>
+      <a href="https://ygxxgcxy.whu.edu.cn/oldhall/" target="_blank" rel="noopener noreferrer">返回旧版</a>
       <button v-if="admin" class="mobile-session" @click="handleLogout"><LogOut :size="17" />退出登录</button>
       <button v-else class="mobile-login" @click="handleAdminClick"><LogIn :size="17" />管理员登录</button>
     </nav>
@@ -69,3 +70,29 @@ watch(
     </button>
   </header>
 </template>
+
+<style scoped>
+.topbar nav a {
+  border: 0;
+  background: none;
+  color: #65736d;
+  font: inherit;
+  font-weight: 600;
+  position: relative;
+  text-decoration: none;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.topbar nav a:hover {
+  color: var(--green);
+}
+
+@media (max-width: 800px) {
+  .topbar nav a {
+    padding: 10px;
+    text-align: center;
+  }
+}
+</style>
