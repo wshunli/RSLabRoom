@@ -16,7 +16,7 @@ export class DatabaseService implements OnApplicationShutdown {
       user: config.get<string>('DB_USER', databaseDefaults.user),
       password: config.get<string>('DB_PASSWORD', databaseDefaults.password),
       database: config.get<string>('DB_NAME', databaseDefaults.database),
-      charset: 'utf8',
+      charset: 'utf8mb4',
       timezone: 'Z',
       dateStrings: true,
       waitForConnections: true,

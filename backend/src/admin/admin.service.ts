@@ -232,7 +232,7 @@ export class AdminService {
 
     const submitCount = await this.database.queryOne<RowDataPacket>('SELECT COUNT(*) AS total FROM submit')
     const pendingCount = await this.database.queryOne<RowDataPacket>('SELECT COUNT(*) AS total FROM submit WHERE sstatus = 0')
-    const userCount = await this.database.queryOne<RowDataPacket>('SELECT COUNT(*) AS total FROM user')
+    const userCount = await this.database.queryOne<RowDataPacket>('SELECT COUNT(*) AS total FROM admin_user')
 
     return {
       today: todayStat,
@@ -541,14 +541,14 @@ export class AdminService {
   }
 
   async getUsers() {
-    const rows = await this.database.query<RowDataPacket[]>('SELECT username FROM user ORDER BY username')
+    const rows = await this.database.query<RowDataPacket[]>('SELECT username FROM admin_user ORDER BY username')
     return rows.map(userResponse)
   }
 
   async createUser(body: CreateUserDto) {
-    const existing = await this.database.queryOne<RowDataPacket>('SELECT username FROM user WHERE username = ?', [body.username])
+    const existing = await this.database.queryOne<RowDataPacket>('SELECT username FROM admin_user WHERE username = ?', [body.username])
     if (existing) throw new ConflictException({ error: '账号已存在' })
-    await this.database.query('INSERT INTO user (username, upwd) VALUES (?, ?)', [
+    await this.database.query('INSERT INTO admin_user (username, upwd) VALUES (?, ?)', [
       body.username,
       createHash('md5').update(body.password).digest('hex'),
     ])
@@ -556,28 +556,28 @@ export class AdminService {
   }
 
   async updateUser(currentUsername: string, body: UpdateUserDto) {
-    const existing = await this.database.queryOne<RowDataPacket>('SELECT username FROM user WHERE username = ?', [currentUsername])
+    const existing = await this.database.queryOne<RowDataPacket>('SELECT username FROM admin_user WHERE username = ?', [currentUsername])
     if (!existing) throw new NotFoundException({ error: '账号不存在' })
     if (body.username !== currentUsername) {
-      const duplicate = await this.database.queryOne<RowDataPacket>('SELECT username FROM user WHERE username = ?', [body.username])
+      const duplicate = await this.database.queryOne<RowDataPacket>('SELECT username FROM admin_user WHERE username = ?', [body.username])
       if (duplicate) throw new ConflictException({ error: '新账号名已存在' })
     }
     if (body.password) {
-      await this.database.query('UPDATE user SET username = ?, upwd = ? WHERE username = ?', [
+      await this.database.query('UPDATE admin_user SET username = ?, upwd = ? WHERE username = ?', [
         body.username,
         createHash('md5').update(body.password).digest('hex'),
         currentUsername,
       ])
     } else {
-      await this.database.query('UPDATE user SET username = ? WHERE username = ?', [body.username, currentUsername])
+      await this.database.query('UPDATE admin_user SET username = ? WHERE username = ?', [body.username, currentUsername])
     }
     return userResponse(body as unknown as RowDataPacket)
   }
 
   async deleteUser(username: string) {
-    const count = await this.database.queryOne<RowDataPacket>('SELECT COUNT(*) AS total FROM user')
+    const count = await this.database.queryOne<RowDataPacket>('SELECT COUNT(*) AS total FROM admin_user')
     if (Number(count?.total) <= 1) throw new BadRequestException({ error: '至少需要保留一个管理员账号' })
-    const result = await this.database.query<ResultSetHeader>('DELETE FROM user WHERE username = ?', [username])
+    const result = await this.database.query<ResultSetHeader>('DELETE FROM admin_user WHERE username = ?', [username])
     if (!result.affectedRows) throw new NotFoundException({ error: '账号不存在' })
     return { id: username, deleted: true }
   }

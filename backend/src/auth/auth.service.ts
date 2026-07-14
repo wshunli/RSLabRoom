@@ -17,7 +17,7 @@ export class AuthService {
   ) {}
 
   async login(username: string, password: string) {
-    const row = await this.database.queryOne<UserRow>('SELECT username, upwd FROM user WHERE username = ?', [username])
+    const row = await this.database.queryOne<UserRow>('SELECT username, upwd FROM admin_user WHERE username = ?', [username])
     const digest = createHash('md5').update(password).digest('hex')
     if (!row || row.upwd !== digest) throw new UnauthorizedException({ error: '账号或密码错误' })
     return {
