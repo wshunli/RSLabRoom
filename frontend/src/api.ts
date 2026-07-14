@@ -169,7 +169,7 @@ export const api = {
     if (filters.courseName) params.set('courseName', filters.courseName)
     if (filters.teacher) params.set('teacher', filters.teacher)
     return request<{
-      items: Array<BookingRequest & { sid: number; detailList: string[] }>
+      items: Array<BookingRequest & { sid: number; detailList: string[]; slotList: Array<{ bid: number; label: string; state: 'pending' | 'approved' | 'rejected' | 'deleted' }> }>
       total: number
       page: number
       pageSize: number
@@ -191,6 +191,11 @@ export const api = {
 
   deleteApplication: (id: string) =>
     request<{ id: string; deleted: boolean }>(`/admin/applications/${id}`, { method: 'DELETE' }),
+
+  updateApplicationSlot: (id: string, bid: number, state: 'pending' | 'approved' | 'rejected' | 'deleted') =>
+    request<{ id: string; bid: number; state: string }>(`/admin/applications/${id}/slots/${bid}/state`, {
+      method: 'PUT', body: JSON.stringify({ state }),
+    }),
 
   // ---- 学期设置（一个学年固定三个学期） ---------------------------------------
   getSemesters: () =>

@@ -21,6 +21,11 @@ export class ApplicationQueryDto {
   pageSize = 15
 }
 
+export class SlotStateDto {
+  @IsIn(['pending', 'approved', 'rejected', 'deleted'])
+  state: 'pending' | 'approved' | 'rejected' | 'deleted'
+}
+
 // 学期配置：一个学年固定包含第一、二、三学期，每学期可配置教学周数及结束后的假期周数。
 export class SemesterDto {
   @Type(() => Number) @IsInt() @Min(1) @Max(3)

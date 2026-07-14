@@ -22,7 +22,9 @@ import { api } from '../../api'
 import type { BookingRequest, RequestState } from '../../types'
 import { adminStore } from '../../stores/admin'
 
-type ApprovalRequest = BookingRequest & { detailList: string[] }
+type SlotState = RequestState
+type ApprovalSlot = { bid: number; label: string; state: SlotState }
+type ApprovalRequest = BookingRequest & { detailList: string[]; slotList: ApprovalSlot[] }
 
 const requests = ref<ApprovalRequest[]>([])
 const selectedRequest = ref<ApprovalRequest | null>(null)
@@ -90,6 +92,7 @@ async function loadApplications() {
       people: item.people,
       details: item.details,
       detailList: item.detailList || [],
+      slotList: item.slotList || [],
       courseName: item.courseName,
       remarks: item.remarks,
       state: item.state,
@@ -174,7 +177,6 @@ async function revokeApproval(id: string) {
 }
 
 async function deleteRequest(id: string) {
-  if (!confirm('确定将该申请标记为“已删除”吗？之后可撤销删除并恢复为待审批。')) return
   try {
     await api.deleteApplication(id)
     if (requests.value.length === 1 && appPage.value > 1) appPage.value -= 1
@@ -190,6 +192,29 @@ function showDetail(request: ApprovalRequest) {
 
 function closeDetail() {
   selectedRequest.value = null
+}
+
+async function updateSlot(slot: ApprovalSlot, state: SlotState) {
+  if (!selectedRequest.value) return
+  try {
+    await api.updateApplicationSlot(selectedRequest.value.id, slot.bid, state)
+    const res = await api.getApplications(appStatus.value, appPage.value, appPageSize.value, {
+      date: filters.value.date, courseName: filters.value.courseName.trim(), teacher: filters.value.teacher.trim(),
+    })
+    const refreshed = res.items.find((item) => item.id === selectedRequest.value?.id)
+    if (refreshed) {
+      selectedRequest.value = {
+        ...selectedRequest.value,
+        state: refreshed.state,
+        details: refreshed.details,
+        detailList: refreshed.detailList,
+        slotList: refreshed.slotList || [],
+      }
+    }
+    await loadApplications()
+  } catch (err) {
+    alert(err instanceof Error ? err.message : '时段状态更新失败')
+  }
 }
 
 onMounted(() => {
@@ -254,7 +279,7 @@ onMounted(() => {
                   <button v-if="request.state === 'pending'" class="approve" title="通过" @click="updateRequest(request.id, 'approved')"><Check />通过</button>
                   <button v-if="request.state === 'pending'" class="reject" title="驳回" @click="updateRequest(request.id, 'rejected')"><X />驳回</button>
                   <button v-if="request.state === 'approved'" class="approve" title="撤销通过" @click="revokeApproval(request.id)"><RotateCcw />撤销通过</button>
-                  <button v-if="request.state === 'rejected' || request.state === 'deleted'" class="restore" :title="request.state === 'deleted' ? '撤销删除' : '撤销驳回'" @click="updateRequest(request.id, 'pending')"><RotateCcw />{{ request.state === 'deleted' ? '撤销删除' : '撤销驳回' }}</button>
+                  <button v-if="request.state === 'rejected' || request.state === 'deleted'" :class="request.state === 'rejected' ? 'reject' : 'restore'" :title="request.state === 'deleted' ? '撤销删除' : '撤销驳回'" @click="updateRequest(request.id, 'pending')"><RotateCcw />{{ request.state === 'deleted' ? '撤销删除' : '撤销驳回' }}</button>
                   <button v-if="request.state !== 'deleted'" class="delete" title="标记删除" @click="deleteRequest(request.id)"><Trash2 />删除</button>
                 </div>
               </td>
@@ -305,11 +330,22 @@ onMounted(() => {
           <li><Users :size="16" /><span>学生人数</span><strong>{{ selectedRequest.people }}</strong></li>
           <li><FileText :size="16" /><span>备注</span><strong>{{ selectedRequest.remarks || '—' }}</strong></li>
         </ul>
-        <div class="approval-slot-section">
+          <div class="approval-slot-section">
           <div class="approval-slot-title"><Clock3 :size="16" /><span>预约时段</span></div>
           <div class="approval-slot-list">
-            <span v-for="detail in selectedRequest.detailList" :key="detail">{{ detail }}</span>
-            <span v-if="!selectedRequest.detailList.length">{{ selectedRequest.details || '—' }}</span>
+            <div v-for="slot in selectedRequest.slotList" :key="slot.bid" class="approval-slot-row">
+              <span class="approval-slot-label">{{ slot.label }}</span>
+              <span class="status" :class="slot.state">{{ statusLabels[slot.state] }}</span>
+              <div class="approval-actions">
+                <button v-if="slot.state === 'approved'" class="approve" title="撤销通过" @click="updateSlot(slot, 'pending')"><RotateCcw />撤销通过</button>
+                <button v-else class="approve" title="通过时段" @click="updateSlot(slot, 'approved')"><Check />通过</button>
+                <button v-if="slot.state === 'rejected'" class="reject" title="撤销驳回" @click="updateSlot(slot, 'pending')"><RotateCcw />撤销驳回</button>
+                <button v-else class="reject" title="驳回时段" @click="updateSlot(slot, 'rejected')"><X />驳回</button>
+                <button v-if="slot.state === 'deleted'" class="restore" title="撤销删除" @click="updateSlot(slot, 'pending')"><RotateCcw />撤销删除</button>
+                <button v-else class="delete" title="删除时段" @click="updateSlot(slot, 'deleted')"><Trash2 />删除</button>
+              </div>
+            </div>
+            <span v-if="!selectedRequest.slotList.length">{{ selectedRequest.details || '—' }}</span>
           </div>
         </div>
         <div class="approval-detail-footer">
@@ -318,7 +354,7 @@ onMounted(() => {
             <button v-if="selectedRequest.state === 'pending'" class="approve" title="通过" @click="updateRequest(selectedRequest.id, 'approved'); closeDetail()"><Check />通过</button>
             <button v-if="selectedRequest.state === 'pending'" class="reject" title="驳回" @click="updateRequest(selectedRequest.id, 'rejected'); closeDetail()"><X />驳回</button>
             <button v-if="selectedRequest.state === 'approved'" class="approve" title="撤销通过" @click="revokeApproval(selectedRequest.id); closeDetail()"><RotateCcw />撤销通过</button>
-            <button v-if="selectedRequest.state === 'rejected' || selectedRequest.state === 'deleted'" class="restore" :title="selectedRequest.state === 'deleted' ? '撤销删除' : '撤销驳回'" @click="updateRequest(selectedRequest.id, 'pending'); closeDetail()"><RotateCcw />{{ selectedRequest.state === 'deleted' ? '撤销删除' : '撤销驳回' }}</button>
+            <button v-if="selectedRequest.state === 'rejected' || selectedRequest.state === 'deleted'" :class="selectedRequest.state === 'rejected' ? 'reject' : 'restore'" :title="selectedRequest.state === 'deleted' ? '撤销删除' : '撤销驳回'" @click="updateRequest(selectedRequest.id, 'pending'); closeDetail()"><RotateCcw />{{ selectedRequest.state === 'deleted' ? '撤销删除' : '撤销驳回' }}</button>
             <button v-if="selectedRequest.state !== 'deleted'" class="delete" title="标记删除" @click="deleteRequest(selectedRequest.id); closeDetail()"><Trash2 />删除</button>
           </div>
         </div>

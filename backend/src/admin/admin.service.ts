@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { ResultSetHeader, RowDataPacket } from 'mysql2'
+import { PoolConnection } from 'mysql2/promise'
 import { DatabaseService } from '../database/database.service'
 import { MailService } from '../mail/mail.service'
 import { JwtService } from '@nestjs/jwt'
@@ -9,7 +10,7 @@ import { rowToRoom } from '../shared/rooms'
 import { formatDate, parseDate, PERIOD_HOURS, PERIOD_NAMES, periodToTag, slotDate } from '../shared/time'
 import { currentSemester, Semester, semesterLabel, semesterTotalWeeks, sortSemesters } from '../shared/semesters'
 import { SemesterStore } from '../shared/semester-store.service'
-import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, UpdateSemestersDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
+import { ApplicationQueryDto, CreateScheduleDto, CreateUserDto, RoomDto, SlotStateDto, UpdateSemestersDto, UpdateSettingsDto, UpdateUserDto } from './admin.dto'
 
 const STATE_BY_CODE: Record<number, string> = { 0: 'pending', 1: 'approved', 2: 'rejected', 3: 'deleted' }
 const SCHEDULING_LOCK = 'rslabroom:scheduling'
@@ -35,15 +36,25 @@ export class AdminService {
   }
 
   private async buildDetails(id: string): Promise<string[]> {
+    const slots = await this.buildSlotDetails(id)
+    return slots.map((slot) => slot.label)
+  }
+
+  private async buildSlotDetails(id: string) {
     const rows = await this.database.query<RowDataPacket[]>(
-      `SELECT b.btime, b.tag, b.bclassid, c.cname
+      `SELECT b.bid, b.btime, b.tag, b.bclassid, b.status, c.cname
          FROM borrow b LEFT JOIN class c ON b.bclassid = c.cid
         WHERE b.btimeid = ? ORDER BY b.btime, b.tag`,
       [id],
     )
     return rows.map((row) => {
       const room = rowToRoom({ cid: row.bclassid, cname: row.cname || '', cintro: '' })
-      return `${room.name || `机房${row.bclassid}`} · ${String(row.btime).slice(0, 10)} · ${PERIOD_NAMES[Number(row.tag) - 1] || ''}`
+      const storedState = Number(row.status)
+      return {
+        bid: Number(row.bid),
+        label: `${room.name || `机房${row.bclassid}`} · ${String(row.btime).slice(0, 10)} · ${PERIOD_NAMES[Number(row.tag) - 1] || ''}`,
+        state: STATE_BY_CODE[storedState] || 'pending',
+      }
     })
   }
 
@@ -81,7 +92,8 @@ export class AdminService {
       params,
     )
     const items = await Promise.all(rows.map(async (row) => {
-      const detailList = await this.buildDetails(String(row.stimeid))
+      const slotList = await this.buildSlotDetails(String(row.stimeid))
+      const detailList = slotList.map((slot) => slot.label)
       return {
         id: row.stimeid,
         sid: row.sid,
@@ -91,6 +103,7 @@ export class AdminService {
         people: Number(row.snumer) || 0,
         details: detailList.join('；'),
         detailList,
+        slotList,
         courseName: row.sname,
         remarks: row.smore,
         state: STATE_BY_CODE[Number(row.sstatus)] || 'pending',
@@ -222,8 +235,8 @@ export class AdminService {
           })
         }
       }
-      await connection.execute('UPDATE borrow SET status = 1 WHERE btimeid = ?', [id])
-      await connection.execute('UPDATE submit SET sstatus = 1 WHERE stimeid = ?', [id])
+      await connection.execute('UPDATE borrow SET status = 1 WHERE btimeid = ? AND status = 0', [id])
+      await this.syncApplicationState(connection, id)
     })
     return { id, state: 'approved' }
   }
@@ -237,8 +250,8 @@ export class AdminService {
       if (Number(applicationRows[0].sstatus) !== 0) {
         throw new ConflictException({ error: '只有待审批申请可以驳回' })
       }
-      await connection.execute('UPDATE borrow SET status = 0 WHERE btimeid = ?', [id])
-      await connection.execute('UPDATE submit SET sstatus = 2 WHERE stimeid = ?', [id])
+      await connection.execute('UPDATE borrow SET status = 2 WHERE btimeid = ? AND status = 0', [id])
+      await this.syncApplicationState(connection, id)
     })
     return { id, state: 'rejected' }
   }
@@ -282,10 +295,54 @@ export class AdminService {
       if (Number(applicationRows[0].sstatus) === 3) {
         throw new ConflictException({ error: '申请已是已删除状态' })
       }
-      await connection.execute('UPDATE borrow SET status = 0 WHERE btimeid = ?', [id])
+      await connection.execute('UPDATE borrow SET status = 3 WHERE btimeid = ?', [id])
       await connection.execute('UPDATE submit SET sstatus = 3 WHERE stimeid = ?', [id])
     })
     return { id, deleted: true, state: 'deleted' }
+  }
+
+  private async syncApplicationState(connection: PoolConnection, id: string) {
+    const [rows] = await connection.execute<RowDataPacket[]>('SELECT status FROM borrow WHERE btimeid = ?', [id])
+    const states = rows.map((row) => Number(row.status))
+    const state = states.length && states.every((value) => value === 3)
+      ? 3
+      : states.length && states.every((value) => value === 1)
+        ? 1
+        : states.length && states.every((value) => value === 2)
+          ? 2
+          : 0
+    await connection.execute('UPDATE submit SET sstatus = ? WHERE stimeid = ?', [state, id])
+    return state
+  }
+
+  private async syncApplicationStateWhenUniform(connection: PoolConnection, id: string) {
+    const [rows] = await connection.execute<RowDataPacket[]>('SELECT status FROM borrow WHERE btimeid = ?', [id])
+    const states = rows.map((row) => Number(row.status))
+    if (!states.length || !states.every((state) => state === states[0])) return
+    await connection.execute('UPDATE submit SET sstatus = ? WHERE stimeid = ?', [states[0], id])
+  }
+
+  async updateApplicationSlot(id: string, bid: string, body: SlotStateDto) {
+    await this.database.serializedTransaction(SCHEDULING_LOCK, async (connection) => {
+      const [rows] = await connection.execute<RowDataPacket[]>(
+        'SELECT bid, btime, bclassid, tag, status FROM borrow WHERE bid = ? AND btimeid = ? FOR UPDATE', [bid, id],
+      )
+      if (!rows.length) throw new NotFoundException({ error: '预约时段不存在' })
+      const slot = rows[0]
+      const target = ({ pending: 0, approved: 1, rejected: 2, deleted: 3 } as const)[body.state]
+      if (target === 1) {
+        const [conflicts] = await connection.execute<RowDataPacket[]>(
+          `SELECT b.bname, b.bperson, b.btime, c.cname
+             FROM borrow b LEFT JOIN class c ON b.bclassid = c.cid
+            WHERE b.status = 1 AND b.btimeid <> ? AND b.btime = ? AND b.bclassid = ? AND b.tag = ? LIMIT 1`,
+          [id, String(slot.btime).slice(0, 10), slot.bclassid, slot.tag],
+        )
+        if (conflicts[0]) throw new ConflictException({ error: '操作失败，该时间段已存在已通过课程' })
+      }
+      await connection.execute('UPDATE borrow SET status = ? WHERE bid = ?', [target, bid])
+      await this.syncApplicationStateWhenUniform(connection, id)
+    })
+    return { id, bid: Number(bid), state: body.state }
   }
 
   async getSemesters() {
